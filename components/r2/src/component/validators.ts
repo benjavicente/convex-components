@@ -30,7 +30,7 @@ export const confirmResultValidator = v.union(
   v.object({ status: v.literal("ready"), upload: uploadValidator }),
   /** The object isn't in R2 yet. */
   v.object({ status: v.literal("notUploaded") }),
-  /** The object didn't match the request; both were deleted. */
+  /** The object didn't match the request, or `onConfirm` threw; both were deleted. */
   v.object({ status: v.literal("rejected"), reason: v.string() }),
   /** No such upload, e.g. already rejected or deleted. */
   v.object({ status: v.literal("missing") }),

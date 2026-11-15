@@ -1,4 +1,4 @@
-import { v } from "convex/values";
+import { ConvexError, v } from "convex/values";
 import { internal } from "./_generated/api.js";
 import type { Doc } from "./_generated/dataModel.js";
 import {
@@ -77,6 +77,16 @@ function mismatch(row: Doc<"uploads">, head: ObjectHead): string | null {
   }
   if (head.sha256 !== row.sha256) return `sha256 is ${head.sha256}, expected ${row.sha256}`;
   return null;
+}
+
+/**
+ * The reason to report when `onConfirm` throws. Only a `ConvexError` with a
+ * string is shown to the client; other errors may carry internals.
+ */
+function refusal(error: unknown): string {
+  if (error instanceof ConvexError && typeof error.data === "string") return error.data;
+  console.error("onConfirm threw; rejecting the upload", error);
+  return "The upload was refused";
 }
 
 async function loadRow(ctx: QueryCtx, uploadId: string) {
@@ -193,8 +203,15 @@ export const finalize = internalMutation({
       await removeRow(ctx, row);
       return { status: "rejected", reason };
     }
+    try {
+      // A throwing callback rolls back its own writes only, so the app
+      // refuses an upload by throwing and the rejection below still commits.
+      await ctx.runMutation(row.onConfirm, { upload, context: row.context });
+    } catch (error) {
+      await removeRow(ctx, row);
+      return { status: "rejected", reason: refusal(error) };
+    }
     await ctx.db.patch("uploads", row._id, { status: "ready" });
-    await ctx.runMutation(row.onConfirm, { upload, context: row.context });
     return { status: "ready", upload };
   },
 });
@@ -209,15 +226,8 @@ export const sweep = internalAction({
     const row = await ctx.runQuery(internal.uploads.load, { uploadId });
     if (!row || row.status === "ready") return;
     const head = await headObject(row.bucket, row.key);
-    if (head) {
-      try {
-        await ctx.runMutation(internal.uploads.finalize, { uploadId, head });
-        return;
-      } catch (error) {
-        console.error(`Confirming upload ${uploadId} failed; deleting it`, error);
-      }
-    }
-    await ctx.runMutation(internal.uploads.discard, { uploadId });
+    if (head) await ctx.runMutation(internal.uploads.finalize, { uploadId, head });
+    else await ctx.runMutation(internal.uploads.discard, { uploadId });
   },
 });
 

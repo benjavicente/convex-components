@@ -1,0 +1,43 @@
+# R2 uploads demo
+
+Users sign in with GitHub and get 5 coins. Two upload types, each with its own request mutation, rules, `onConfirm` and table:
+
+- **Stickers** (`convex/stickers.ts`): images up to 10 KB for 1 coin, stored with a label.
+- **Documents** (`convex/documents.ts`): PDF or text up to 50 KB for 3 coins, stored with a title.
+
+Each request checks the price before signing, and each `onConfirm` charges the coins. When two pending uploads can't both be paid, the second `onConfirm` throws a `ConvexError`, and that upload is rejected and deleted.
+
+## Run it
+
+1. Start a local backend (no Convex account needed) and note its site URL, usually `http://127.0.0.1:3211`:
+
+   ```sh
+   CONVEX_AGENT_MODE=anonymous pnpm exec convex dev --once
+   ```
+
+2. Create a GitHub OAuth app with the callback URL `<site URL>/oauth/github/callback`.
+3. Create an R2 bucket, an API token with Object Read & Write on it, and this CORS rule:
+
+   ```json
+   [
+     {
+       "AllowedOrigins": ["http://localhost:5173"],
+       "AllowedMethods": ["PUT"],
+       "AllowedHeaders": ["content-type", "if-none-match", "x-amz-checksum-sha256"]
+     }
+   ]
+   ```
+
+4. Set the env vars, then run the backend and the page together:
+
+   ```sh
+   pnpm exec convex env set AUTH_GITHUB_CLIENT_ID ...
+   pnpm exec convex env set AUTH_GITHUB_CLIENT_SECRET ...
+   pnpm exec convex env set R2_ACCOUNT_ID ...
+   pnpm exec convex env set R2_ACCESS_KEY_ID ...
+   pnpm exec convex env set R2_SECRET_ACCESS_KEY ...
+   pnpm exec convex env set R2_BUCKET ...
+   pnpm run dev
+   ```
+
+Open http://localhost:5173.

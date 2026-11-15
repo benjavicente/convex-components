@@ -4,17 +4,33 @@ packages:
 
 # Shared versions: package.json files use "catalog:".
 catalog:
+  "@convex-dev/auth": 2.0.0
   "@edge-runtime/vm": 5.0.0
   "@smithy/hash-node": 4.5.2
   "@smithy/protocol-http": 5.6.2
   "@smithy/signature-v4": 5.7.5
   "@types/node": 26.6.6
+  "@types/react": 19.3.0
+  "@types/react-dom": 19.3.0
+  "@vitejs/plugin-react": 6.3.0
   convex-test: 0.0.71
   convex: 1.50.0
+  react-dom: 19.3.1
+  react: 19.3.1
   typescript: 7.0.2
+  vite: npm:@voidzero-dev/vite-plus-core@1.6.0
   vite-plus: 1.6.0
 
 catalogMode: strict
+# From the Vite+ template: Vite plugins (e.g. @vitejs/plugin-react) must see
+# Vite+'s core as `vite`, or their types and runtime don't match.
+overrides:
+  vite@*: "catalog:"
+peerDependencyRules:
+  allowAny:
+    - vite
+  allowedVersions:
+    vite: "*"
 savePrefix: ""
 # The Convex CLI bundles functions with esbuild, which needs its install script.
 permissions:

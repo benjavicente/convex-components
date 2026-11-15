@@ -14,7 +14,7 @@ Run from the root unless noted. Use the local `vp` (`pnpm exec vp`, or a global 
 - `vp check --fix`: format and fix lint.
 - `vp run -r build`: build packages to `dist/`. Examples import the built package, so build after changing a component.
 - `vp test` (in a package): run its tests.
-- Codegen (in `examples/r2-basic`): `pnpm run codegen`. It regenerates the component's and the app's `_generated/`, which are committed. It needs the example's deployment; with none, run `CONVEX_AGENT_MODE=anonymous pnpm exec convex dev --once` there first (a local backend, no account).
+- Codegen (in `examples/r2-demo`): `pnpm run codegen`. It regenerates the component's and the app's `_generated/`, which are committed. It needs the example's deployment; with none, run `CONVEX_AGENT_MODE=anonymous pnpm exec convex dev --once` there first (a local backend, no account).
 - Real R2 checks (in `components/r2`): `pnpm run test:r2` with `R2_TEST_ACCOUNT_ID`, `R2_TEST_ACCESS_KEY_ID`, `R2_TEST_SECRET_ACCESS_KEY` and `R2_TEST_BUCKET` set. Skipped without them.
 
 ## Conventions

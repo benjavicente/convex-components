@@ -1,0 +1,11 @@
+import { setupGithub } from "@convex-dev/auth/methods/github/server";
+import { setupConvexAuth } from "@convex-dev/auth/server";
+import { components, internal } from "./_generated/api";
+
+const auth = setupConvexAuth({ component: components.auth });
+export const { signOut, refreshSession, isAuthenticated } = auth;
+
+export const { startSignInWithGithub, completeSignInWithGithub } = setupGithub(auth, {
+  component: components.authGithub,
+  allowedRedirectOrigins: ["http://localhost:5173"],
+}).attachUserCallbacks({ createUser: internal.users.createUser });

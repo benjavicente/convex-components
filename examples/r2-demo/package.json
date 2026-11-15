@@ -1,5 +1,5 @@
 {
-  "name": "r2-basic",
+  "name": "r2-demo",
   "private": true,
   "type": "module",
   "scripts": {
@@ -9,10 +9,16 @@
   },
   "dependencies": {
     "@benjavicente/convex-r2": "workspace:*",
-    "convex": "catalog:"
+    "@convex-dev/auth": "catalog:",
+    "convex": "catalog:",
+    "react": "catalog:",
+    "react-dom": "catalog:"
   },
   "devDependencies": {
     "@edge-runtime/vm": "catalog:",
+    "@types/react": "catalog:",
+    "@types/react-dom": "catalog:",
+    "@vitejs/plugin-react": "catalog:",
     "convex-test": "catalog:",
     "typescript": "catalog:",
     "vite-plus": "catalog:"

@@ -4,7 +4,7 @@ Uploads to Cloudflare R2 from a Convex app, where every object belongs to a row 
 
 - The app defines one request mutation per upload type. It authorizes the user, then asks the component for a URL.
 - The component generates the key (`<prefix>/<upload id>`). It signs a 5-minute PUT bound to the declared `Content-Type`, `Content-Length` and SHA-256, plus `If-None-Match: *`, so the PUT can't overwrite an existing object.
-- After the PUT, the server checks the real object against the request. On a match, it marks the upload ready and runs the app's `onConfirm` mutation with `{ upload, context }` in one transaction. On a mismatch, it deletes both the object and the request.
+- After the PUT, the server checks the real object against the request. On a match, it runs the app's `onConfirm` mutation with `{ upload, context }` and marks the upload ready, in one transaction. On a mismatch, or when `onConfirm` throws, it deletes both the object and the request at once.
 - Requests that are never confirmed are checked after they expire: they are confirmed if the object matches, and deleted otherwise.
 - Credentials come from the component's env vars and never become function arguments. There are no runtime dependencies (SigV4 on WebCrypto).
 
@@ -83,8 +83,13 @@ export const onUploaded = internalMutation({
     context: v.object({ companyId: v.id("companies"), uploadedBy: v.id("users") }),
   },
   handler: async (ctx, { upload, context }) => {
-    // Throwing here rejects the upload; expiry then deletes it.
-    await ctx.db.insert("companyDocuments", { ...context, uploadId: upload.uploadId, name: upload.name });
+    // Throwing rejects the upload and deletes it. The message of a
+    // ConvexError("...") reaches the client as the rejection reason.
+    await ctx.db.insert("companyDocuments", {
+      ...context,
+      uploadId: upload.uploadId,
+      name: upload.name,
+    });
   },
 });
 
@@ -98,7 +103,10 @@ export const confirmUpload = action({
 Also available:
 
 - `r2.get(ctx, uploadId)` returns the upload with its status, expiry and Cloudflare dashboard link.
-- `r2.getUrl(ctx, uploadId, { expiresIn, disposition })` returns a signed GET that serves the file under its name, for ready uploads only. A query's result stays cached until the data changes, even after the URL expires, so sign from a mutation or action when the URL must be fresh.
+- `r2.getUrl(ctx, uploadId, { expiresIn, disposition })` returns a signed GET that serves the file under its name, for ready uploads only.
+
+  > A Convex query's result stays cached until the data it read changes, not until the URL inside it expires, so a subscribed page can keep showing an expired URL. Sign from a mutation or action when the URL must be fresh, or use an `expiresIn` longer than the page lives.
+
 - `r2.delete(ctx, uploadId)` deletes the upload and its object.
 
 ## Browser
@@ -115,3 +123,14 @@ const { confirmed } = await uploadFile(file, {
 ```
 
 `uploadFile` hashes the file (reading it into memory), PUTs it with XHR for progress, then calls `confirm`. Without `confirm`, the upload is confirmed after the URL expires plus 10 minutes of grace.
+
+## Size
+
+Compared with `@convex-dev/r2` 0.10.4, which signs with the AWS SDK. Each figure is the bundle growth over a control module with one trivial function, built with esbuild settings that reproduce Convex's bundler: renamed identifiers, whitespace kept, external source maps. A real Convex push of the `@convex-dev/r2` app side came out slightly larger: 583 KB of JS and 703 KB of maps.
+
+| Added by the package                   | `@convex-dev/r2`         | this package               |
+| -------------------------------------- | ------------------------ | -------------------------- |
+| App functions: JS / gzip / source maps | 540 / 131 / 681 KB       | 2.9 / 0.9 / 2.8 KB         |
+| Component functions: JS / gzip / maps  | 472 / 114 / 619 KB       | 20 / 4.9 / 23 KB           |
+| Browser helper (min / gzip)            | React hook: 0.6 / 0.4 KB | `uploadFile`: 1.3 / 0.7 KB |
+| `node_modules`                         | ~22 MB, 17 packages      | no dependencies            |

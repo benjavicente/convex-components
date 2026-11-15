@@ -5,10 +5,12 @@ packages:
 # Shared versions: package.json files use "catalog:".
 catalog:
   "@edge-runtime/vm": 5.0.0
+  "@smithy/hash-node": 4.5.2
+  "@smithy/protocol-http": 5.6.2
+  "@smithy/signature-v4": 5.7.5
   "@types/node": 26.6.6
-  aws4fetch: 1.0.20
-  convex: 1.50.0
   convex-test: 0.0.71
+  convex: 1.50.0
   typescript: 7.0.2
   vite-plus: 1.6.0
 

@@ -34,8 +34,10 @@
   },
   "devDependencies": {
     "@edge-runtime/vm": "catalog:",
+    "@smithy/hash-node": "catalog:",
+    "@smithy/protocol-http": "catalog:",
+    "@smithy/signature-v4": "catalog:",
     "@types/node": "catalog:",
-    "aws4fetch": "catalog:",
     "convex": "catalog:",
     "convex-test": "catalog:",
     "typescript": "catalog:",

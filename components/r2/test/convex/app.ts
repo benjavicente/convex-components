@@ -41,14 +41,14 @@ export const confirm = action({
 });
 
 export const store = action({
-  args: { text: v.string() },
-  handler: (ctx, { text }): Promise<StoreResult> =>
+  args: { text: v.string(), refuse: v.optional(v.boolean()) },
+  handler: (ctx, { text, refuse = false }): Promise<StoreResult> =>
     r2.store(ctx, {
       keyPrefix: "notes",
       file: new Blob([text], { type: "text/plain" }),
       name: "note.txt",
       onConfirm: internal.app.onConfirm,
-      context: { refuse: false },
+      context: { refuse },
     }),
 });
 

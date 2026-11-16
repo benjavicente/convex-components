@@ -210,7 +210,6 @@ export const finalize = internalMutation({
     const row = await loadRow(ctx, uploadId);
     if (!row) return { status: "missing" };
     if (!row.pending) return { status: "ready" };
-    const { onConfirm, context } = row.pending;
     const reason = mismatch(row, head);
     if (reason) {
       // Details stay in the logs: anyone with the upload id may confirm it.
@@ -218,18 +217,44 @@ export const finalize = internalMutation({
       await removeRow(ctx, row);
       return { status: "rejected", reason: "The file doesn't match its upload request" };
     }
-    try {
-      // A throwing callback rolls back its own writes only, so the app
-      // refuses an upload by throwing and the rejection below still commits.
-      await ctx.runMutation(onConfirm, { upload: toUpload(row), context });
-    } catch (error) {
-      await removeRow(ctx, row);
-      return { status: "rejected", reason: refusal(error) };
-    }
-    await ctx.db.patch("uploads", row._id, { pending: undefined });
-    return { status: "ready" };
+    return accept(ctx, row, row.pending);
   },
 });
+
+/**
+ * Runs `onConfirm` for an upload the server PUT itself (`R2.store`), without
+ * reading R2: the PUT was signed for the declared size and SHA-256, so R2
+ * accepting it proves the object matches. Trusts its caller, so only call it
+ * after a successful PUT.
+ */
+export const confirmStored = mutation({
+  args: { uploadId: v.string() },
+  returns: confirmResultValidator,
+  handler: async (ctx, { uploadId }): Promise<ConfirmResult> => {
+    const row = await loadRow(ctx, uploadId);
+    if (!row) return { status: "missing" };
+    if (!row.pending) return { status: "ready" };
+    return accept(ctx, row, row.pending);
+  },
+});
+
+/** Runs `onConfirm` and marks the upload ready, or deletes it if `onConfirm` throws. */
+async function accept(
+  ctx: MutationCtx,
+  row: Doc<"uploads">,
+  { onConfirm, context }: NonNullable<Doc<"uploads">["pending"]>,
+): Promise<ConfirmResult> {
+  try {
+    // A throwing callback rolls back its own writes only, so the app
+    // refuses an upload by throwing and the rejection below still commits.
+    await ctx.runMutation(onConfirm, { upload: toUpload(row), context });
+  } catch (error) {
+    await removeRow(ctx, row);
+    return { status: "rejected", reason: refusal(error) };
+  }
+  await ctx.db.patch("uploads", row._id, { pending: undefined });
+  return { status: "ready" };
+}
 
 /**
  * Runs once per request after its URL expired: confirms an upload the client

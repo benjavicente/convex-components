@@ -482,14 +482,14 @@ progress::-moz-progress-bar {
 }
 .desk-rules ol {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 30px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 28px 40px;
   margin-top: 20px;
 }
 .desk-rules li {
   display: flex;
   align-items: flex-start;
-  gap: 12px;
+  gap: 14px;
 }
 .desk-rules li > span {
   flex-shrink: 0;
@@ -497,19 +497,36 @@ progress::-moz-progress-bar {
   place-items: center;
   border: 1px solid #b9bda7;
   border-radius: 50%;
-  height: 26px;
-  width: 26px;
+  height: 30px;
+  width: 30px;
   font-family: var(--font-display);
-  font-size: 14px;
+  font-size: 15px;
   background: #ecebd7;
 }
-.desk-rules strong {
-  font-size: 12px;
+.desk-rules .step-heading {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  font-size: 16px;
 }
-.desk-rules li p {
-  font-size: 11px;
-  margin-top: 4px;
+.desk-rules .step-heading small {
+  font-size: 12px;
   color: #5c655b;
+}
+.desk-rules code {
+  display: inline-block;
+  margin-top: 6px;
+  padding: 2px 8px;
+  border-radius: 6px;
+  background: #ecebd7;
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+.desk-rules li p:last-child {
+  font-size: 14px;
+  line-height: 1.5;
+  margin-top: 6px;
+  color: #4a5249;
 }
 .footer-line {
   display: flex;

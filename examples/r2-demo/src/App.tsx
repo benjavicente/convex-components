@@ -7,7 +7,7 @@ import {
 import { useConvexAuth, useMutation, useQuery } from "convex/react";
 import { useState, type ReactNode } from "react";
 import { api } from "../convex/_generated/api";
-import { DOCUMENTS, STARTING_COINS, STICKERS } from "../convex/lib/pricing";
+import { DOCUMENTS, STICKERS } from "../convex/lib/pricing";
 import type { Doc } from "../convex/_generated/dataModel";
 import { errorMessage, UploadForm } from "./UploadForm";
 
@@ -60,11 +60,6 @@ function SignIn() {
         <section className="name-card paper-card">
           <div className="name-band">Try the demo</div>
           <div className="name-body">
-            <p>
-              Sign in with GitHub to get <strong>{STARTING_COINS} coins</strong>. A sticker costs{" "}
-              {STICKERS.cost} coins and a document costs {DOCUMENTS.cost}. Deleting a file gives its
-              coins back.
-            </p>
             <button
               className="button ink w-full"
               disabled={signin.isPending}
@@ -152,48 +147,50 @@ function Intro() {
   );
 }
 
+const steps = [
+  {
+    title: "Request",
+    where: "Your mutation",
+    code: "r2.requestUpload(ctx, { file, rules, onConfirm, context })",
+    text: "Checks who is uploading and what it costs, then passes the file's name, type, size and SHA-256. The component saves the request first and signs a single-use URL that expires in 5 minutes.",
+  },
+  {
+    title: "Upload",
+    where: "Browser",
+    code: "uploadFile(file, { request, confirm, onProgress, signal })",
+    text: "Hashes the file and sends it straight to R2, with progress and cancel. R2 refuses a file whose type, size or hash differs from the signed one, and a second upload to the same key.",
+  },
+  {
+    title: "Confirm",
+    where: "Component",
+    code: "onConfirm: internal.stickers.onUploaded",
+    text: "Compares the stored file with the request, then runs your onConfirm with the upload and your context, in the same transaction. If it throws a ConvexError, the file is deleted and the browser gets the message.",
+  },
+  {
+    title: "Clean up",
+    where: "Component",
+    code: 'crons.daily("delete old uploads", …)',
+    text: "A request the browser never confirms is checked when it expires: a matching file is confirmed, anything else is deleted. This demo also deletes files after 30 days.",
+  },
+];
+
 function DeskRules() {
   return (
     <footer className="desk-rules">
-      <p className="font-display text-xl">How it works</p>
+      <h2 className="font-display text-2xl">How it works</h2>
       <ol>
-        <li>
-          <span>1</span>
-          <div>
-            <strong>Request</strong>
-            <p>
-              Your mutation checks the user and the price. The component then signs a 5-minute,
-              single-use upload URL for that exact file: its type, size and SHA-256.
-            </p>
-          </div>
-        </li>
-        <li>
-          <span>2</span>
-          <div>
-            <strong>Upload</strong>
-            <p>The browser hashes the file and sends it to R2 directly, with progress.</p>
-          </div>
-        </li>
-        <li>
-          <span>3</span>
-          <div>
-            <strong>Confirm</strong>
-            <p>
-              The server compares the stored file with the request and runs your{" "}
-              <code>onConfirm</code> in the same transaction. If it throws, the file is deleted.
-            </p>
-          </div>
-        </li>
-        <li>
-          <span>4</span>
-          <div>
-            <strong>Clean up</strong>
-            <p>
-              Uploads that are never confirmed are checked when they expire. This demo also deletes
-              files after 30 days.
-            </p>
-          </div>
-        </li>
+        {steps.map((step, index) => (
+          <li key={step.title}>
+            <span aria-hidden="true">{index + 1}</span>
+            <div>
+              <p className="step-heading">
+                <strong>{step.title}</strong> <small>{step.where}</small>
+              </p>
+              <code>{step.code}</code>
+              <p>{step.text}</p>
+            </div>
+          </li>
+        ))}
       </ol>
       <p className="footer-line">Built with Convex and Cloudflare R2</p>
     </footer>

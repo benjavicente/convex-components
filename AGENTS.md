@@ -20,7 +20,7 @@ Run from the root unless noted. Use the local `vp` (`pnpm exec vp`, or a global 
 ## Conventions
 
 - English everywhere. Conventional commits, small and coherent. No AI co-author trailers or attribution.
-- Pin every dependency in the `catalog` of `pnpm-workspace.yaml` (`catalogMode: strict`); `package.json` files use `catalog:`.
+- Pin dependencies exactly. Ones shared by several packages go in the `catalog` of `pnpm-workspace.yaml` and are referenced as `catalog:`; the rest are pinned in their package's `package.json`.
 - Prefer tool defaults; a comment next to each non-default setting says why.
 - One source per fact; no config or docs without a current need.
 - Import test and config helpers from `vite-plus` (`vite-plus/test`), not `vitest` or `vite`.

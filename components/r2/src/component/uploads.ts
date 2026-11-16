@@ -34,8 +34,15 @@ import {
 
 /** Lifetime of an upload URL, in seconds. */
 export const UPLOAD_URL_EXPIRES_IN = 5 * 60;
-/** Time after URL expiry for an upload that started in time to finish. */
-export const SWEEP_GRACE_MS = 10 * 60 * 1000;
+/**
+ * Time after URL expiry for an upload that started in time to finish: a
+ * minute, plus the file at 1 MB/s, up to 15 minutes. R2 checks expiry when the
+ * PUT starts, so a slower upload of a large file can still be discarded
+ * mid-way and leave an orphan object.
+ */
+export function sweepGraceMs(size: number) {
+  return Math.min(60_000 + size / 1000, 15 * 60_000);
+}
 /** R2's limit for a single PUT. */
 const MAX_PUT_SIZE = 5 * 1024 ** 3;
 /** R2 calls retried by scheduled jobs: 4 s, 16 s, … up to about 6 hours in total. */
@@ -141,7 +148,7 @@ export const request = mutation({
     });
     const key = `${keyPrefix}/${uploadId}`;
     await ctx.db.patch("uploads", uploadId, { key });
-    await ctx.scheduler.runAt(expiresAt + SWEEP_GRACE_MS, internal.uploads.sweep, {
+    await ctx.scheduler.runAt(expiresAt + sweepGraceMs(file.size), internal.uploads.sweep, {
       uploadId,
       bucket,
       key,

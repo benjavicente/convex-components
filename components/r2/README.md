@@ -144,7 +144,7 @@ const { confirmed } = await uploadFile(file, {
 });
 ```
 
-`uploadFile` hashes the file (reading it into memory), PUTs it with XHR for progress, then calls `confirm`. Without `confirm`, the upload is confirmed after the URL expires plus 10 minutes of grace.
+`uploadFile` hashes the file (reading it into memory), PUTs it with XHR for progress, then calls `confirm`. Without `confirm`, the upload is confirmed after the URL expires plus a grace period: a minute, plus a second per MB, up to 15 minutes.
 
 ## Compared with `@convex-dev/r2`
 

@@ -36,12 +36,12 @@ import {
 export const UPLOAD_URL_EXPIRES_IN = 5 * 60;
 /**
  * Time after URL expiry for an upload that started in time to finish: a
- * minute, plus the file at 1 MB/s, up to 15 minutes. R2 checks expiry when the
+ * minute, plus the file at 1 MB/s, up to 30 minutes. R2 checks expiry when the
  * PUT starts, so a slower upload of a large file can still be discarded
  * mid-way and leave an orphan object.
  */
 export function sweepGraceMs(size: number) {
-  return Math.min(60_000 + size / 1000, 15 * 60_000);
+  return Math.min(60_000 + size / 1000, 30 * 60_000);
 }
 /** R2's limit for a single PUT. */
 const MAX_PUT_SIZE = 5 * 1024 ** 3;

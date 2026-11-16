@@ -144,7 +144,7 @@ const { confirmed } = await uploadFile(file, {
 });
 ```
 
-`uploadFile` hashes the file (reading it into memory), PUTs it with XHR for progress, then calls `confirm`. Without `confirm`, the upload is confirmed after the URL expires plus a grace period: a minute, plus a second per MB, up to 15 minutes.
+`uploadFile` hashes the file (reading it into memory), PUTs it with XHR for progress, then calls `confirm`. Without `confirm`, the upload is confirmed after the URL expires plus a grace period: a minute, plus a second per MB, up to 30 minutes.
 
 ## Compared with `@convex-dev/r2`
 
@@ -163,6 +163,102 @@ Measured against version 0.10.4.
 | Signing                         | AWS SDK v3.                                                                                               | About 100 lines of SigV4 on WebCrypto, tested against the AWS SDK's signer.                                                     |
 
 `@convex-dev/r2` also lists every object's metadata, and accepts custom keys and per-bucket credentials. Here the app's own tables reference their uploads, so listing is the app's own query; keys are always server-generated; and one component instance uses one Cloudflare account.
+
+### The same upload in both
+
+A document upload from [the demo](../../examples/r2-demo/convex/documents.ts): signed-in users only, at most 40 KB of PDF, text or Markdown, with a title, and a coin it costs checked when the URL is requested and again when the file arrives.
+
+With this package, the checks, the title and the callback travel with the request:
+
+```ts
+export const requestUpload = mutation({
+  args: { title: v.string(), ...fileValidator.fields },
+  handler: async (ctx, { title, ...file }): Promise<RequestedUpload> => {
+    const ownerId = await currentUserId(ctx);
+    title = requiredText(title, "A document needs a title");
+    await assertCoins(ctx, ownerId, DOCUMENTS.cost);
+    return r2.requestUpload(ctx, {
+      keyPrefix: `documents/${ownerId}`,
+      file,
+      rules: { maxSize: DOCUMENTS.maxSize, contentTypes: DOCUMENTS.contentTypes },
+      onConfirm: internal.documents.onUploaded,
+      context: { ownerId, title },
+    });
+  },
+});
+
+export const onUploaded = internalMutation({
+  args: {
+    upload: uploadValidator,
+    context: v.object({ ownerId: v.id("users"), title: v.string() }),
+  },
+  handler: async (ctx, { upload, context }) => {
+    await assertCoins(ctx, context.ownerId, DOCUMENTS.cost);
+    const { uploadId, name, size } = upload;
+    await ctx.db.insert("documents", { ...context, uploadId, fileName: name, size });
+  },
+});
+```
+
+With `@convex-dev/r2`, `syncMetadata` receives only the key, so the app keeps the request in its own table. The URL doesn't bind size or type, so they are checked after the upload, and a refused object is deleted by hand:
+
+```ts
+// schema.ts: one more table for requests in flight.
+pendingDocuments: defineTable({
+  key: v.string(),
+  ownerId: v.id("users"),
+  title: v.string(),
+  fileName: v.string(),
+}).index("key", ["key"]),
+
+// documents.ts
+export const r2 = new R2(components.r2);
+const callbacks: R2Callbacks = internal.documents;
+
+// The client calls this instead of the generated `generateUploadUrl`,
+// which takes no arguments.
+export const requestUpload = mutation({
+  args: { title: v.string(), fileName: v.string() },
+  handler: async (ctx, { title, fileName }) => {
+    const ownerId = await currentUserId(ctx);
+    title = requiredText(title, "A document needs a title");
+    await assertCoins(ctx, ownerId, DOCUMENTS.cost);
+    const { key, url } = await r2.generateUploadUrl(`documents/${ownerId}/${crypto.randomUUID()}`);
+    await ctx.db.insert("pendingDocuments", { key, ownerId, title, fileName });
+    return { key, url };
+  },
+});
+
+export const { syncMetadata, onSyncMetadata } = r2.clientApi<DataModel>({
+  callbacks,
+  checkUpload: async (ctx) => {
+    await currentUserId(ctx);
+  },
+  // Runs in a later transaction, after the component's action read the object.
+  // `syncMetadata` has already returned, so a throw here doesn't reach the
+  // client; it has to watch a query to learn the outcome.
+  onSyncMetadata: async (ctx, { key }) => {
+    const pending = await ctx.db
+      .query("pendingDocuments")
+      .withIndex("key", (q) => q.eq("key", key))
+      .unique();
+    if (!pending) return;
+    await ctx.db.delete(pending._id);
+    const { ownerId, title, fileName } = pending;
+    const metadata = await r2.getMetadata(ctx, key);
+    const size = metadata?.size ?? 0;
+    const accepted =
+      size > 0 &&
+      size <= DOCUMENTS.maxSize &&
+      DOCUMENTS.contentTypes.includes(metadata?.contentType ?? "") &&
+      (await coinsLeft(ctx, ownerId)) >= DOCUMENTS.cost;
+    if (!accepted) return await r2.deleteObject(ctx, key);
+    await ctx.db.insert("documents", { ownerId, title, key, fileName, size });
+  },
+});
+```
+
+On top of that, `useUploadFile` calls the generated `generateUploadUrl`, so the client needs its own upload code. A request whose file never arrives stays in `pendingDocuments` until a cron cleans it up. A file uploaded without `syncMetadata` is never checked: it stays in the bucket and no row refers to it.
 
 ### Size
 

@@ -4,24 +4,19 @@ import { internal } from "./_generated/api";
 import { internalMutation, mutation, query } from "./_generated/server";
 import { currentUserId } from "./lib/auth";
 import { assertCoins, spendCoins } from "./lib/coins";
+import { DOCUMENTS } from "./lib/pricing";
 import { r2 } from "./lib/r2";
-
-/** Documents: up to 50 KB for 3 coins. */
-const COST = 3;
 
 export const requestUpload = mutation({
   args: { title: v.string(), ...fileValidator.fields },
   handler: async (ctx, { title, ...file }): Promise<RequestedUpload> => {
     const ownerId = await currentUserId(ctx);
     if (!title.trim()) throw new Error("A document needs a title");
-    await assertCoins(ctx, ownerId, COST);
+    await assertCoins(ctx, ownerId, DOCUMENTS.cost);
     return r2.requestUpload(ctx, {
       keyPrefix: `documents/${ownerId}`,
       file,
-      rules: {
-        maxSize: 50 * 1024,
-        contentTypes: ["application/pdf", "text/plain", "text/markdown"],
-      },
+      rules: { maxSize: DOCUMENTS.maxSize, contentTypes: DOCUMENTS.contentTypes },
       onConfirm: internal.documents.onUploaded,
       context: { ownerId, title: title.trim() },
     });
@@ -34,7 +29,7 @@ export const onUploaded = internalMutation({
     context: v.object({ ownerId: v.id("users"), title: v.string() }),
   },
   handler: async (ctx, { upload, context }) => {
-    await spendCoins(ctx, context.ownerId, COST);
+    await spendCoins(ctx, context.ownerId, DOCUMENTS.cost);
     const { uploadId, name, size } = upload;
     await ctx.db.insert("documents", { ...context, uploadId, fileName: name, size });
   },

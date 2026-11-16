@@ -124,9 +124,9 @@ describe("requesting uploads", () => {
 
   test.each([
     ["stickers", { contentType: "application/pdf" }, "not allowed"],
-    ["stickers", { size: 10 * 1024 + 1 }, "larger than 10240"],
+    ["stickers", { size: 200 * 1024 + 1 }, "larger than 204800"],
     ["documents", { contentType: "image/png" }, "not allowed"],
-    ["documents", { size: 50 * 1024 + 1 }, "larger than 51200"],
+    ["documents", { size: 40 * 1024 + 1 }, "larger than 40960"],
     ["documents", { size: 0 }, "positive integer"],
     ["documents", { sha256: "ABC" }, "lowercase hex"],
   ] as const)("%s rejects %o with a message for the client", async (type, change, message) => {
@@ -145,16 +145,16 @@ describe("requesting uploads", () => {
     const alice = await signIn(t, "alice");
     await t.run((ctx) => ctx.db.patch("users", alice.userId, { coins: 2 }));
     await expect(
-      alice.as.mutation(api.documents.requestUpload, { title: "Contract", ...pdf }),
+      alice.as.mutation(api.stickers.requestUpload, { label: "cat", ...png }),
     ).rejects.toThrow("This costs 3 coins; you have 2");
     await expect(
-      alice.as.mutation(api.stickers.requestUpload, { label: "cat", ...png }),
+      alice.as.mutation(api.documents.requestUpload, { title: "Contract", ...pdf }),
     ).resolves.toMatchObject({ uploadId: expect.any(String) });
   });
 });
 
 describe("confirming uploads", () => {
-  test("a sticker costs 1 coin and a document 3, each in its own table", async () => {
+  test("a sticker costs 3 coins and a document 1, each in its own table", async () => {
     const t = setup();
     const alice = await signIn(t, "alice");
     fakeR2(uploadedAsDeclared(png));
@@ -162,7 +162,7 @@ describe("confirming uploads", () => {
     expect(await t.action(api.uploads.confirm, { uploadId: sticker.uploadId })).toMatchObject({
       status: "ready",
     });
-    expect(await coins(alice)).toBe(4);
+    expect(await coins(alice)).toBe(2);
 
     fakeR2(uploadedAsDeclared(pdf));
     const doc = await alice.as.mutation(api.documents.requestUpload, {
@@ -192,16 +192,16 @@ describe("confirming uploads", () => {
     });
     const first = await t.action(api.uploads.confirm, { uploadId });
     expect(await t.action(api.uploads.confirm, { uploadId })).toEqual(first);
-    expect(await coins(alice)).toBe(4);
+    expect(await coins(alice)).toBe(2);
   });
 
   test("onConfirm refusing (coins spent meanwhile) deletes the upload at once", async () => {
     const t = setup();
     const alice = await signIn(t, "alice");
     // Both requests pass the price check with 5 coins; only one can be paid.
-    const first = await alice.as.mutation(api.documents.requestUpload, { title: "A", ...pdf });
-    const second = await alice.as.mutation(api.documents.requestUpload, { title: "B", ...pdf });
-    const calls = fakeR2(uploadedAsDeclared(pdf));
+    const first = await alice.as.mutation(api.stickers.requestUpload, { label: "A", ...png });
+    const second = await alice.as.mutation(api.stickers.requestUpload, { label: "B", ...png });
+    const calls = fakeR2(uploadedAsDeclared(png));
 
     await t.action(api.uploads.confirm, { uploadId: first.uploadId });
     expect(await t.action(api.uploads.confirm, { uploadId: second.uploadId })).toEqual({
@@ -212,7 +212,7 @@ describe("confirming uploads", () => {
 
     expect(calls).toContainEqual({ method: "DELETE", path: `/demo/${second.key}` });
     expect(await coins(alice)).toBe(2);
-    expect(await alice.as.query(api.documents.mine, {})).toMatchObject([{ title: "A" }]);
+    expect(await alice.as.query(api.stickers.mine, {})).toMatchObject([{ label: "A" }]);
     expect(await t.action(api.uploads.confirm, { uploadId: second.uploadId })).toEqual({
       status: "missing",
     });
@@ -273,7 +273,7 @@ describe("expiry", () => {
     await t.finishAllScheduledFunctions(vi.runAllTimers);
 
     expect(await alice.as.query(api.stickers.mine, {})).toMatchObject([{ uploadId }]);
-    expect(await coins(alice)).toBe(4);
+    expect(await coins(alice)).toBe(2);
   });
 
   test("deletes a request that was never uploaded", async () => {
@@ -333,6 +333,28 @@ describe("reading and deleting", () => {
     expect(await t.action(api.uploads.confirm, { uploadId: document.uploadId })).toEqual({
       status: "missing",
     });
+  });
+});
+
+describe("retention", () => {
+  test("the daily cleanup deletes uploads older than 30 days, with their files", async () => {
+    const t = setup();
+    const alice = await signIn(t, "alice");
+    const calls = fakeR2(uploadedAsDeclared(pdf));
+    const old = await alice.as.mutation(api.documents.requestUpload, { title: "Old", ...pdf });
+    await t.action(api.uploads.confirm, { uploadId: old.uploadId });
+
+    vi.advanceTimersByTime(29 * 24 * 60 * 60 * 1000);
+    const recent = await alice.as.mutation(api.documents.requestUpload, { title: "New", ...pdf });
+    await t.action(api.uploads.confirm, { uploadId: recent.uploadId });
+    vi.advanceTimersByTime(2 * 24 * 60 * 60 * 1000);
+
+    await t.mutation(internal.cleanup.deleteOldUploads, {});
+    await t.finishAllScheduledFunctions(vi.runAllTimers);
+
+    expect(await alice.as.query(api.documents.mine, {})).toMatchObject([{ title: "New" }]);
+    expect(calls).toContainEqual({ method: "DELETE", path: `/demo/${old.key}` });
+    expect(calls).not.toContainEqual({ method: "DELETE", path: `/demo/${recent.key}` });
   });
 });
 

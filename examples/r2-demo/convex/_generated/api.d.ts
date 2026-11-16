@@ -9,9 +9,12 @@
  */
 
 import type * as auth from "../auth.js";
+import type * as cleanup from "../cleanup.js";
+import type * as crons from "../crons.js";
 import type * as documents from "../documents.js";
 import type * as lib_auth from "../lib/auth.js";
 import type * as lib_coins from "../lib/coins.js";
+import type * as lib_pricing from "../lib/pricing.js";
 import type * as lib_r2 from "../lib/r2.js";
 import type * as stickers from "../stickers.js";
 import type * as uploads from "../uploads.js";
@@ -25,9 +28,12 @@ import type {
 
 declare const fullApi: ApiFromModules<{
   auth: typeof auth;
+  cleanup: typeof cleanup;
+  crons: typeof crons;
   documents: typeof documents;
   "lib/auth": typeof lib_auth;
   "lib/coins": typeof lib_coins;
+  "lib/pricing": typeof lib_pricing;
   "lib/r2": typeof lib_r2;
   stickers: typeof stickers;
   uploads: typeof uploads;

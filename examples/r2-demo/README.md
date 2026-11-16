@@ -2,10 +2,12 @@
 
 Users sign in with GitHub and get 5 coins. Two upload types, each with its own request mutation, rules, `onConfirm` and table:
 
-- **Stickers** (`convex/stickers.ts`): images up to 10 KB for 1 coin, stored with a label.
-- **Documents** (`convex/documents.ts`): PDF or text up to 50 KB for 3 coins, stored with a title.
+- **Stickers** (`convex/stickers.ts`): images up to 200 KB for 3 coins, stored with a label.
+- **Documents** (`convex/documents.ts`): PDF or text up to 40 KB for 1 coin, stored with a title.
 
 Each request checks the price before signing, and each `onConfirm` charges the coins. When two pending uploads can't both be paid, the second `onConfirm` throws a `ConvexError`, and that upload is rejected and deleted.
+
+Prices and limits live in `convex/lib/pricing.ts`, shared with the page. A daily cron (`convex/crons.ts`) deletes uploads older than 30 days, with their files.
 
 ## Run it
 

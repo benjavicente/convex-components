@@ -4,23 +4,18 @@ import { internal } from "./_generated/api";
 import { internalMutation, mutation, query } from "./_generated/server";
 import { currentUserId } from "./lib/auth";
 import { assertCoins, spendCoins } from "./lib/coins";
+import { STICKERS } from "./lib/pricing";
 import { r2 } from "./lib/r2";
-
-/** Small images: up to 10 KB for 1 coin. */
-const COST = 1;
 
 export const requestUpload = mutation({
   args: { label: v.string(), ...fileValidator.fields },
   handler: async (ctx, { label, ...file }): Promise<RequestedUpload> => {
     const ownerId = await currentUserId(ctx);
-    await assertCoins(ctx, ownerId, COST);
+    await assertCoins(ctx, ownerId, STICKERS.cost);
     return r2.requestUpload(ctx, {
       keyPrefix: `stickers/${ownerId}`,
       file,
-      rules: {
-        maxSize: 10 * 1024,
-        contentTypes: ["image/png", "image/jpeg", "image/webp", "image/gif"],
-      },
+      rules: { maxSize: STICKERS.maxSize, contentTypes: STICKERS.contentTypes },
       onConfirm: internal.stickers.onUploaded,
       context: { ownerId, label },
     });
@@ -33,7 +28,7 @@ export const onUploaded = internalMutation({
     context: v.object({ ownerId: v.id("users"), label: v.string() }),
   },
   handler: async (ctx, { upload, context }) => {
-    await spendCoins(ctx, context.ownerId, COST);
+    await spendCoins(ctx, context.ownerId, STICKERS.cost);
     await ctx.db.insert("stickers", { ...context, uploadId: upload.uploadId });
   },
 });

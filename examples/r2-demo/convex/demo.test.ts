@@ -107,6 +107,7 @@ beforeEach(() => {
 });
 afterEach(() => {
   vi.useRealTimers();
+  vi.restoreAllMocks();
   vi.unstubAllEnvs();
   vi.unstubAllGlobals();
 });
@@ -300,11 +301,16 @@ describe("confirming uploads", () => {
       ...png,
     });
     const calls = fakeR2(() => ({ ...uploadedAsDeclared(png)(), ...change }));
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
 
     const result = await t.action(api.uploads.confirm, { uploadId });
     await t.finishAllScheduledFunctions(vi.runAllTimers);
 
-    expect(result).toMatchObject({ status: "rejected", reason: expect.stringContaining(reason) });
+    expect(result).toEqual({
+      status: "rejected",
+      reason: "The file doesn't match its upload request",
+    });
+    expect(warn).toHaveBeenCalledWith(expect.stringContaining(reason));
     expect(calls).toContainEqual({ method: "DELETE", path: `/demo/${key}` });
     expect(await coins(alice)).toBe(10);
     expect(await alice.as.query(api.stickers.mine, {})).toEqual([]);
@@ -373,8 +379,10 @@ describe("expiry", () => {
 
     await t.finishAllScheduledFunctions(vi.runAllTimers);
 
+    // The second DELETE, a day later, removes a slow PUT that landed meanwhile.
     expect(calls).toEqual([
       { method: "HEAD", path: `/demo/${key}` },
+      { method: "DELETE", path: `/demo/${key}` },
       { method: "DELETE", path: `/demo/${key}` },
     ]);
     expect(await t.action(api.uploads.confirm, { uploadId })).toEqual({ status: "missing" });

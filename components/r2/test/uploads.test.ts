@@ -2,7 +2,10 @@
 // The component's flow under convex-test, through a minimal app (./convex).
 // R2 is faked; src/r2.live.test.ts checks what real R2 enforces.
 import { convexTest } from "convex-test";
-import { afterEach, beforeEach, describe, expect, test, vi } from "vite-plus/test";
+import type { FunctionReturnType } from "convex/server";
+import { afterEach, beforeEach, describe, expect, expectTypeOf, test, vi } from "vite-plus/test";
+import type { ConfirmResult } from "../src/client/index.js";
+import type { ComponentApi } from "../src/component/_generated/component.js";
 import { sweepGraceMs } from "../src/component/uploads.js";
 import { register } from "../src/test.js";
 import { api } from "./convex/_generated/api.js";
@@ -18,13 +21,17 @@ type Stored = { size: number; contentType: string; sha256: string };
 type Call = { method: string; key: string };
 
 /**
- * Fakes R2. A PUT stores what it sends; HEAD answers with `head(key)` if
- * given, else the stored object, else 404. Like Cloudflare, it compresses text
+ * Fakes R2. A PUT stores what it sends and a DELETE removes it; HEAD answers
+ * with `head(key)` if given, else the stored object, else 404. Like Cloudflare, it compresses text
  * and drops Content-Length unless the request asks for `Accept-Encoding: identity`.
  */
+let objects = new Map<string, Stored>();
+let failingDeletes = 0;
+
 function fakeR2(head?: (key: string) => Stored | null) {
   const calls: Call[] = [];
-  const objects = new Map<string, Stored>();
+  objects = new Map();
+  failingDeletes = 0;
   vi.stubGlobal(
     "fetch",
     vi.fn(async (input: string, init: RequestInit = {}) => {
@@ -40,7 +47,11 @@ function fakeR2(head?: (key: string) => Stored | null) {
         });
         return new Response(null, { status: 200 });
       }
-      if (method !== "HEAD") return new Response(null, { status: 204 });
+      if (method === "DELETE") {
+        if (failingDeletes-- > 0) return new Response("R2 is down", { status: 500 });
+        objects.delete(key);
+        return new Response(null, { status: 204 });
+      }
       const object = head ? head(key) : (objects.get(key) ?? null);
       if (!object) return new Response(null, { status: 404 });
       const compressed =
@@ -64,6 +75,16 @@ const asDeclared = (file: { size: number; contentType: string }) => () => ({
   sha256: sha256Base64,
 });
 
+/** PUTs `pdf`'s bytes the way a browser would, with the signed headers. */
+async function put(target: { url: string; headers: Record<string, string> }) {
+  const response = await fetch(target.url, {
+    method: "PUT",
+    headers: target.headers,
+    body: new Blob(["hello"]),
+  });
+  expect(response.ok).toBe(true);
+}
+
 function setup() {
   const t = convexTest(schema, modules);
   register(t);
@@ -79,8 +100,15 @@ beforeEach(() => {
 });
 afterEach(() => {
   vi.useRealTimers();
+  vi.restoreAllMocks();
   vi.unstubAllEnvs();
   vi.unstubAllGlobals();
+});
+
+test("the generated component types match the validators (rerun codegen if not)", () => {
+  expectTypeOf<
+    FunctionReturnType<ComponentApi["uploads"]["confirm"]>
+  >().toEqualTypeOf<ConfirmResult>();
 });
 
 describe("request", () => {
@@ -146,11 +174,17 @@ describe("confirm", () => {
     const t = setup();
     const { uploadId, key } = await t.mutation(api.app.request, { file: pdf });
     const calls = fakeR2(() => ({ ...asDeclared(pdf)(), ...change }));
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
 
     const result = await t.action(api.app.confirm, { uploadId });
     await t.finishAllScheduledFunctions(vi.runAllTimers);
 
-    expect(result).toEqual({ status: "rejected", reason: expect.stringContaining(reason) });
+    // The details are logged, not returned: anyone with the id may confirm.
+    expect(result).toEqual({
+      status: "rejected",
+      reason: "The file doesn't match its upload request",
+    });
+    expect(warn).toHaveBeenCalledWith(expect.stringContaining(reason));
     expect(calls).toContainEqual({ method: "DELETE", key });
     expect(await t.query(api.app.documents, {})).toEqual([]);
     expect(await t.action(api.app.confirm, { uploadId })).toEqual({ status: "missing" });
@@ -230,8 +264,10 @@ describe("sweep after expiry", () => {
     const calls = fakeR2(() => null);
     const { uploadId, key } = await t.mutation(api.app.request, { file: pdf });
     await t.finishAllScheduledFunctions(vi.runAllTimers);
+    // The second DELETE, a day later, removes a slow PUT that landed meanwhile.
     expect(calls).toEqual([
       { method: "HEAD", key },
+      { method: "DELETE", key },
       { method: "DELETE", key },
     ]);
     expect(await t.action(api.app.confirm, { uploadId })).toEqual({ status: "missing" });
@@ -239,12 +275,49 @@ describe("sweep after expiry", () => {
 
   test("deletes the key again, in case a deleted upload was PUT again before expiry", async () => {
     const t = setup();
-    const calls = fakeR2(asDeclared(pdf));
-    const { uploadId, key } = await t.mutation(api.app.request, { file: pdf });
-    await t.action(api.app.confirm, { uploadId });
-    await t.mutation(api.app.remove, { uploadId });
+    fakeR2();
+    const target = await t.mutation(api.app.request, { file: pdf });
+    await put(target);
+    await t.action(api.app.confirm, { uploadId: target.uploadId });
+    await t.mutation(api.app.remove, { uploadId: target.uploadId });
+    vi.advanceTimersByTime(1);
+    await t.finishInProgressScheduledFunctions();
+    expect(objects.has(target.key)).toBe(false);
+
+    // The URL is still valid: the same PUT can store the file again.
+    await put(target);
+    expect(objects.has(target.key)).toBe(true);
     await t.finishAllScheduledFunctions(vi.runAllTimers);
-    expect(calls.filter((c) => c.method === "DELETE" && c.key === key)).toHaveLength(2);
+    expect(objects.has(target.key)).toBe(false);
+  });
+
+  test("deletes a slow PUT that lands after the sweep discarded its request", async () => {
+    const t = setup();
+    fakeR2();
+    const target = await t.mutation(api.app.request, { file: pdf });
+    vi.advanceTimersByTime(10 * 60_000);
+    await t.finishInProgressScheduledFunctions();
+    expect(await t.action(api.app.confirm, { uploadId: target.uploadId })).toEqual({
+      status: "missing",
+    });
+
+    await put(target);
+    await t.finishAllScheduledFunctions(vi.runAllTimers);
+    expect(objects.has(target.key)).toBe(false);
+    expect(await t.query(api.app.documents, {})).toEqual([]);
+  });
+
+  test("retries a DELETE that R2 fails", async () => {
+    const t = setup();
+    const calls = fakeR2();
+    const target = await t.mutation(api.app.request, { file: pdf });
+    await put(target);
+    await t.action(api.app.confirm, { uploadId: target.uploadId });
+    failingDeletes = 2;
+    await t.mutation(api.app.remove, { uploadId: target.uploadId });
+    await t.finishAllScheduledFunctions(vi.runAllTimers);
+    expect(objects.has(target.key)).toBe(false);
+    expect(calls.filter((c) => c.method === "DELETE").length).toBeGreaterThanOrEqual(3);
   });
 
   test("retries when R2 fails", async () => {
@@ -293,6 +366,7 @@ describe("reading, deleting and storing", () => {
     await t.finishAllScheduledFunctions(vi.runAllTimers);
     expect(calls).toContainEqual({ method: "DELETE", key });
     expect(await t.query(api.app.get, { uploadId })).toBeNull();
+    expect(await t.action(api.app.confirm, { uploadId })).toEqual({ status: "missing" });
   });
 
   test("store uploads from an action through the same confirm", async () => {

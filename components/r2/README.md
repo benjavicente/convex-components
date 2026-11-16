@@ -4,7 +4,7 @@ Uploads to Cloudflare R2 from a Convex app, where every object belongs to a row 
 
 - The app defines one request mutation per upload type. It authorizes the user, then asks the component for a URL.
 - The component generates the key (`<prefix>/<upload id>`). It signs a 5-minute PUT bound to the declared `Content-Type`, `Content-Length` and SHA-256, plus `If-None-Match: *`, so the PUT can't overwrite an existing object.
-- After the PUT, the server checks the real object against the request. On a match, it runs the app's `onConfirm` mutation with `{ upload, context }` and marks the upload ready, in one transaction. On a mismatch, or when `onConfirm` throws, it deletes both the object and the request at once.
+- After the PUT, the server checks the real object against the request. On a match, it runs the app's `onConfirm` mutation with `{ upload, context }` and marks the upload ready, in one transaction. On a mismatch, or when `onConfirm` throws, it deletes the request and schedules the object's deletion.
 - Requests that are never confirmed are checked after they expire: they are confirmed if the object matches, and deleted otherwise.
 - Credentials come from the component's env vars and never become function arguments. There are no runtime dependencies (SigV4 on WebCrypto).
 
@@ -85,7 +85,8 @@ export const onUploaded = internalMutation({
   },
   handler: async (ctx, { upload, context }) => {
     // Throwing rejects the upload and deletes it. The message of a
-    // ConvexError("...") reaches the client as the rejection reason. Any other
+    // ConvexError("...") reaches the client as the rejection reason, and anyone
+    // who confirms this upload id sees it, so leave file names out. Any other
     // error rejects it too, including a missing function after a rename, so
     // keep this name while uploads are pending.
     await ctx.db.insert("companyDocuments", {
@@ -97,7 +98,8 @@ export const onUploaded = internalMutation({
 });
 
 // Needs no authorization: it only compares R2 with the stored request, and
-// returns a status (and a reason when rejected), never the file's details.
+// returns a status (and a reason when rejected), never the file's details. A
+// mismatch is reported without the expected values, which are logged instead.
 export const confirmUpload = action({
   args: { uploadId: v.string() },
   handler: (ctx, { uploadId }) => r2.confirm(ctx, uploadId),
@@ -160,7 +162,7 @@ Measured against version 0.10.4.
 | Refusing an upload              | Throw in `checkUpload`; the object stays in the bucket.                                                   | Throw in `onConfirm`; the object and its request are deleted, and the `ConvexError` message is returned.                        |
 | Uploads never confirmed         | Stay in the bucket.                                                                                       | Checked after the URL expires: confirmed if they match, deleted otherwise.                                                      |
 | Credentials                     | App env vars, passed to the component as function arguments, so scheduled jobs store them.                | Component env vars bound by reference. They are never function arguments.                                                       |
-| Browser                         | React and Svelte hooks.                                                                                   | `uploadFile`, framework-agnostic, with hashing, progress and `AbortSignal`.                                                     |
+| Browser                         | React, Svelte and Vue hooks.                                                                              | `uploadFile`, framework-agnostic, with hashing, progress and `AbortSignal`.                                                     |
 | Signing                         | AWS SDK v3.                                                                                               | About 100 lines of SigV4 on WebCrypto, tested against the AWS SDK's signer.                                                     |
 
 `@convex-dev/r2` also lists every object's metadata, and accepts custom keys and per-bucket credentials. Here the app's own tables reference their uploads, so listing is the app's own query; keys are always server-generated; and one component instance uses one Cloudflare account.

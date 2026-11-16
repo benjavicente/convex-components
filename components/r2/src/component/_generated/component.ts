@@ -28,18 +28,7 @@ export type ComponentApi<Name extends string | undefined = string | undefined> =
         "action",
         "internal",
         { uploadId: string },
-        | {
-            status: "ready";
-            upload: {
-              bucket: string;
-              contentType: string;
-              key: string;
-              name: string;
-              sha256: string;
-              size: number;
-              uploadId: string;
-            };
-          }
+        | { status: "ready" }
         | { status: "notUploaded" }
         | { reason: string; status: "rejected" }
         | { status: "missing" },

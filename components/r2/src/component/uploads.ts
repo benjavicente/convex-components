@@ -37,12 +37,14 @@ export const UPLOAD_URL_EXPIRES_IN = 5 * 60;
 /**
  * Time after URL expiry for an upload that started in time to finish: a
  * minute, plus the file at 1 MB/s, up to 30 minutes. R2 checks expiry when the
- * PUT starts, so a slower upload of a large file can still be discarded
- * mid-way and leave an orphan object.
+ * PUT starts, so a slower upload can still be discarded mid-way; `discard`
+ * deletes its key again later.
  */
 export function sweepGraceMs(size: number) {
   return Math.min(60_000 + size / 1000, 30 * 60_000);
 }
+/** How long after a sweep a PUT that started in time might still land. */
+const LATE_PUT_MS = 24 * 60 * 60 * 1000;
 /** R2's limit for a single PUT. */
 const MAX_PUT_SIZE = 5 * 1024 ** 3;
 /** R2 calls retried by scheduled jobs: 4 s, 16 s, … up to about 6 hours in total. */
@@ -211,8 +213,10 @@ export const finalize = internalMutation({
     const { onConfirm, context } = row.pending;
     const reason = mismatch(row, head);
     if (reason) {
+      // Details stay in the logs: anyone with the upload id may confirm it.
+      console.warn(`Upload ${uploadId} rejected: ${reason}`);
       await removeRow(ctx, row);
-      return { status: "rejected", reason };
+      return { status: "rejected", reason: "The file doesn't match its upload request" };
     }
     try {
       // A throwing callback rolls back its own writes only, so the app
@@ -254,12 +258,22 @@ export const sweep = internalAction({
   },
 });
 
-/** Deletes a request that is still pending, and its object. */
+/**
+ * Deletes a request whose object wasn't there when swept, and deletes the key
+ * again a day later: a slow PUT that started before the URL expired can still
+ * land after the sweep, and nothing else would ever remove it.
+ */
 export const discard = internalMutation({
   args: { uploadId: v.id("uploads") },
   handler: async (ctx, { uploadId }) => {
     const row = await ctx.db.get("uploads", uploadId);
-    if (row?.pending) await removeRow(ctx, row);
+    if (!row?.pending) return;
+    await removeRow(ctx, row);
+    await ctx.scheduler.runAfter(LATE_PUT_MS, internal.uploads.deleteObject, {
+      bucket: row.bucket,
+      key: row.key,
+      attempt: 1,
+    });
   },
 });
 

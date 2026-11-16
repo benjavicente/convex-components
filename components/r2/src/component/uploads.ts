@@ -38,7 +38,9 @@ export const UPLOAD_URL_EXPIRES_IN = 5 * 60;
 export const SWEEP_GRACE_MS = 10 * 60 * 1000;
 /** R2's limit for a single PUT. */
 const MAX_PUT_SIZE = 5 * 1024 ** 3;
-const DELETE_ATTEMPTS = 5;
+/** R2 calls retried by scheduled jobs: 4 s, 16 s, … up to about 6 hours in total. */
+const ATTEMPTS = 8;
+const retryDelay = (attempt: number) => 1000 * 4 ** attempt;
 
 function toUpload(row: Doc<"uploads">): Upload {
   const { _id, bucket, key, name, contentType, size, sha256 } = row;
@@ -135,14 +137,16 @@ export const request = mutation({
       bucket,
       key: "",
       ...file,
-      status: "pending",
-      expiresAt,
-      onConfirm,
-      context,
+      pending: { expiresAt, onConfirm, context },
     });
     const key = `${keyPrefix}/${uploadId}`;
     await ctx.db.patch("uploads", uploadId, { key });
-    await ctx.scheduler.runAt(expiresAt + SWEEP_GRACE_MS, internal.uploads.sweep, { uploadId });
+    await ctx.scheduler.runAt(expiresAt + SWEEP_GRACE_MS, internal.uploads.sweep, {
+      uploadId,
+      bucket,
+      key,
+      attempt: 1,
+    });
 
     // Browsers set Content-Length themselves; it is signed but not returned.
     const headers = {
@@ -171,7 +175,7 @@ export const confirm = action({
   handler: async (ctx, { uploadId }): Promise<ConfirmResult> => {
     const row = await ctx.runQuery(internal.uploads.load, { uploadId });
     if (!row) return { status: "missing" };
-    if (row.status === "ready") return { status: "ready", upload: toUpload(row) };
+    if (!row.pending) return { status: "ready", upload: toUpload(row) };
     const head = await headObject(row.bucket, row.key);
     if (!head) return { status: "notUploaded" };
     return ctx.runMutation(internal.uploads.finalize, { uploadId, head });
@@ -197,7 +201,8 @@ export const finalize = internalMutation({
     const row = await loadRow(ctx, uploadId);
     if (!row) return { status: "missing" };
     const upload = toUpload(row);
-    if (row.status === "ready") return { status: "ready", upload };
+    if (!row.pending) return { status: "ready", upload };
+    const { onConfirm, context } = row.pending;
     const reason = mismatch(row, head);
     if (reason) {
       await removeRow(ctx, row);
@@ -206,29 +211,40 @@ export const finalize = internalMutation({
     try {
       // A throwing callback rolls back its own writes only, so the app
       // refuses an upload by throwing and the rejection below still commits.
-      await ctx.runMutation(row.onConfirm, { upload, context: row.context });
+      await ctx.runMutation(onConfirm, { upload, context });
     } catch (error) {
       await removeRow(ctx, row);
       return { status: "rejected", reason: refusal(error) };
     }
-    const { uploadId: _, ...object } = upload;
-    await ctx.db.replace("uploads", row._id, { ...object, status: "ready" });
+    await ctx.db.patch("uploads", row._id, { pending: undefined });
     return { status: "ready", upload };
   },
 });
 
 /**
  * Runs once per request after its URL expired: confirms an upload the client
- * never confirmed, or deletes the request and any object.
+ * never confirmed, or deletes the request and any object. When the row is
+ * already gone (rejected or deleted), it deletes the key anyway: until the URL
+ * expired, the client could PUT the file again.
  */
 export const sweep = internalAction({
-  args: { uploadId: v.id("uploads") },
-  handler: async (ctx, { uploadId }) => {
-    const row = await ctx.runQuery(internal.uploads.load, { uploadId });
-    if (!row || row.status === "ready") return;
-    const head = await headObject(row.bucket, row.key);
-    if (head) await ctx.runMutation(internal.uploads.finalize, { uploadId, head });
-    else await ctx.runMutation(internal.uploads.discard, { uploadId });
+  args: { uploadId: v.id("uploads"), bucket: v.string(), key: v.string(), attempt: v.number() },
+  handler: async (ctx, args) => {
+    const { uploadId } = args;
+    try {
+      const row = await ctx.runQuery(internal.uploads.load, { uploadId });
+      if (row && !row.pending) return;
+      if (!row) return await deleteR2Object(args.bucket, args.key);
+      const head = await headObject(row.bucket, row.key);
+      if (head) await ctx.runMutation(internal.uploads.finalize, { uploadId, head });
+      else await ctx.runMutation(internal.uploads.discard, { uploadId });
+    } catch (error) {
+      if (args.attempt >= ATTEMPTS) throw error;
+      await ctx.scheduler.runAfter(retryDelay(args.attempt), internal.uploads.sweep, {
+        ...args,
+        attempt: args.attempt + 1,
+      });
+    }
   },
 });
 
@@ -237,7 +253,7 @@ export const discard = internalMutation({
   args: { uploadId: v.id("uploads") },
   handler: async (ctx, { uploadId }) => {
     const row = await ctx.db.get("uploads", uploadId);
-    if (row?.status === "pending") await removeRow(ctx, row);
+    if (row?.pending) await removeRow(ctx, row);
   },
 });
 
@@ -247,8 +263,8 @@ export const deleteObject = internalAction({
     try {
       await deleteR2Object(args.bucket, args.key);
     } catch (error) {
-      if (args.attempt >= DELETE_ATTEMPTS) throw error;
-      await ctx.scheduler.runAfter(1000 * 4 ** args.attempt, internal.uploads.deleteObject, {
+      if (args.attempt >= ATTEMPTS) throw error;
+      await ctx.scheduler.runAfter(retryDelay(args.attempt), internal.uploads.deleteObject, {
         ...args,
         attempt: args.attempt + 1,
       });
@@ -274,9 +290,9 @@ export const get = query({
     if (!row) return null;
     const link = dashboardLink(r2Config().accountId, row.bucket, row.key);
     const info = { ...toUpload(row), link };
-    return row.status === "pending"
-      ? { ...info, status: row.status, expiresAt: row.expiresAt }
-      : { ...info, status: row.status };
+    return row.pending
+      ? { ...info, status: "pending" as const, expiresAt: row.pending.expiresAt }
+      : { ...info, status: "ready" as const };
   },
 });
 
@@ -309,8 +325,12 @@ export const getUrl = query({
   },
   returns: v.union(v.string(), v.null()),
   handler: async (ctx, { uploadId, expiresIn = 15 * 60, disposition = "inline" }) => {
+    // SigV4's limit is 7 days.
+    if (!Number.isInteger(expiresIn) || expiresIn < 1 || expiresIn > 604800) {
+      throw new Error("expiresIn must be a whole number of seconds from 1 to 604800");
+    }
     const row = await loadRow(ctx, uploadId);
-    if (row?.status !== "ready") return null;
+    if (!row || row.pending) return null;
     return presignObject(row.bucket, row.key, {
       method: "GET",
       query: { "response-content-disposition": contentDisposition(disposition, row.name) },

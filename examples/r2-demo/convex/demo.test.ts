@@ -326,6 +326,45 @@ describe("expiry", () => {
     ]);
     expect(await t.action(api.uploads.confirm, { uploadId })).toEqual({ status: "missing" });
   });
+
+  test("deletes the key again after the URL expires, in case a deleted upload was PUT again", async () => {
+    const t = setup();
+    const alice = await signIn(t, "alice");
+    const calls = fakeR2(uploadedAsDeclared(png));
+    const { uploadId, key } = await alice.as.mutation(api.stickers.requestUpload, {
+      label: "cat",
+      ...png,
+    });
+    await t.action(api.uploads.confirm, { uploadId });
+    const [sticker] = await alice.as.query(api.stickers.mine, {});
+    await alice.as.mutation(api.stickers.remove, { stickerId: sticker!._id });
+
+    await t.finishAllScheduledFunctions(vi.runAllTimers);
+
+    const deletes = calls.filter(
+      (call) => call.method === "DELETE" && call.path === `/demo/${key}`,
+    );
+    expect(deletes).toHaveLength(2);
+  });
+
+  test("retries the expiry check when R2 fails", async () => {
+    const t = setup();
+    const alice = await signIn(t, "alice");
+    let failures = 2;
+    const calls = fakeR2(() => {
+      if (failures-- > 0) throw new Error("R2 is down");
+      return uploadedAsDeclared(png)();
+    });
+    const { uploadId } = await alice.as.mutation(api.stickers.requestUpload, {
+      label: "cat",
+      ...png,
+    });
+
+    await t.finishAllScheduledFunctions(vi.runAllTimers);
+
+    expect(calls.filter((call) => call.method === "HEAD")).toHaveLength(3);
+    expect(await alice.as.query(api.stickers.mine, {})).toMatchObject([{ uploadId }]);
+  });
 });
 
 describe("reading and deleting", () => {

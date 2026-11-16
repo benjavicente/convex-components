@@ -85,7 +85,9 @@ export const onUploaded = internalMutation({
   },
   handler: async (ctx, { upload, context }) => {
     // Throwing rejects the upload and deletes it. The message of a
-    // ConvexError("...") reaches the client as the rejection reason.
+    // ConvexError("...") reaches the client as the rejection reason. Any other
+    // error rejects it too, including a missing function after a rename, so
+    // keep this name while uploads are pending.
     await ctx.db.insert("companyDocuments", {
       ...context,
       uploadId: upload.uploadId,

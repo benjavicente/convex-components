@@ -1,9 +1,14 @@
-import { fileValidator, type RequestedUpload, uploadValidator } from "@benjavicente/convex-r2";
-import { v } from "convex/values";
-import { internal } from "./_generated/api";
-import { internalMutation, mutation, query } from "./_generated/server";
+import {
+  type ConfirmResult,
+  fileValidator,
+  type RequestedUpload,
+  uploadValidator,
+} from "@benjavicente/convex-r2";
+import { ConvexError, v } from "convex/values";
+import { api, internal } from "./_generated/api";
+import { action, internalMutation, mutation, query } from "./_generated/server";
 import { currentUserId } from "./lib/auth";
-import { assertCoins } from "./lib/coins";
+import { assertCoins, priceError } from "./lib/coins";
 import { requiredText } from "./lib/text";
 import { DOCUMENTS } from "./lib/pricing";
 import { r2 } from "./lib/r2";
@@ -20,6 +25,26 @@ export const requestUpload = mutation({
       rules: { maxSize: DOCUMENTS.maxSize, contentTypes: DOCUMENTS.contentTypes },
       onConfirm: internal.documents.onUploaded,
       context: { ownerId, title },
+    });
+  },
+});
+
+/** The server writes the file itself, with `r2.store`; it still costs a document's price. */
+export const writeNote = action({
+  args: {},
+  handler: async (ctx): Promise<ConfirmResult> => {
+    const me = await ctx.runQuery(api.users.me, {});
+    if (!me) throw new ConvexError("Sign in first");
+    if (me.coins < DOCUMENTS.cost) throw priceError(DOCUMENTS.cost, me.coins);
+    const ownerId = me._id;
+    const date = new Date().toISOString().slice(0, 10);
+    const note = `# A note from the server\n\nWritten for ${me.login} on ${date} with \`r2.store\`.\n`;
+    return r2.store(ctx, {
+      keyPrefix: `documents/${ownerId}`,
+      file: new Blob([note], { type: "text/markdown" }),
+      name: `note-${date}.md`,
+      onConfirm: internal.documents.onUploaded,
+      context: { ownerId, title: "A note from the server" },
     });
   },
 });

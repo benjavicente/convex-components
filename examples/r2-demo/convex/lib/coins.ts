@@ -22,5 +22,10 @@ export async function coinsLeft(ctx: QueryCtx, ownerId: Id<"users">) {
  */
 export async function assertCoins(ctx: QueryCtx, ownerId: Id<"users">, cost: number) {
   const coins = await coinsLeft(ctx, ownerId);
-  if (coins < cost) throw new ConvexError(`This costs ${cost} coins; you have ${coins}`);
+  if (coins < cost) throw priceError(cost, coins);
+}
+
+/** The `ConvexError` the client shows when the user can't pay. */
+export function priceError(cost: number, coins: number) {
+  return new ConvexError(`This costs ${cost} ${cost === 1 ? "coin" : "coins"}; you have ${coins}`);
 }

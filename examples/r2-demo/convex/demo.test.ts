@@ -21,17 +21,31 @@ const pdf = { name: "Contrato ñ.pdf", contentType: "application/pdf", size: 5, 
 type Call = { method: string; path: string };
 type FakeObject = { size: number; contentType: string; sha256: string };
 
-/** Fakes R2: HEAD answers with the object stored under that key, or 404. */
+/**
+ * Fakes R2: HEAD answers with `objects(key)`, or else what the server PUT
+ * there, or 404. Browser PUTs aren't simulated; tests declare them in `objects`.
+ */
 function fakeR2(objects: (key: string) => FakeObject | null) {
   const calls: Call[] = [];
+  const put = new Map<string, FakeObject>();
   vi.stubGlobal(
     "fetch",
     vi.fn(async (input: string, init?: RequestInit) => {
       const method = init?.method ?? "GET";
       const path = decodeURIComponent(new URL(input).pathname);
+      const key = path.replace(/^\/demo\//, "");
       calls.push({ method, path });
-      if (method !== "HEAD") return new Response(null, { status: 204 });
-      const object = objects(path.replace(/^\/demo\//, ""));
+      if (method === "PUT") {
+        const body = await new Response(init?.body).arrayBuffer();
+        const digest = new Uint8Array(await crypto.subtle.digest("SHA-256", body));
+        put.set(key, {
+          size: body.byteLength,
+          contentType: new Headers(init?.headers).get("content-type") ?? "",
+          sha256: btoa(String.fromCharCode(...digest)),
+        });
+      }
+      if (method !== "HEAD") return new Response(null, { status: 200 });
+      const object = objects(key) ?? put.get(key) ?? null;
       if (!object) return new Response(null, { status: 404 });
       return new Response(null, {
         headers: {
@@ -308,6 +322,43 @@ describe("confirming uploads", () => {
     expect(await t.action(api.uploads.confirm, { uploadId: "nope" })).toEqual({
       status: "missing",
     });
+  });
+});
+
+describe("storing from an action", () => {
+  test("r2.store uploads the server's bytes and runs the same onConfirm", async () => {
+    const t = setup();
+    const alice = await signIn(t, "alice");
+    const calls = fakeR2(() => null);
+
+    const result = await alice.as.action(api.documents.writeNote, {});
+
+    expect(result).toMatchObject({ status: "ready", upload: { contentType: "text/markdown" } });
+    expect(calls.map((call) => call.method)).toEqual(["PUT", "HEAD"]);
+    expect(await alice.as.query(api.documents.mine, {})).toMatchObject([
+      { title: "A note from the server", fileName: expect.stringMatching(/^note-.*\.md$/) },
+    ]);
+    expect(await coins(alice)).toBe(9);
+  });
+
+  test("checks the price before uploading", async () => {
+    const t = setup();
+    const alice = await signIn(t, "alice");
+    await keepStickers(t, alice.userId, 3);
+    await t.run((ctx) =>
+      ctx.db.insert("documents", {
+        ownerId: alice.userId,
+        uploadId: "kept",
+        title: "kept",
+        fileName: "kept.txt",
+        size: 1,
+      }),
+    );
+    const calls = fakeR2(() => null);
+    await expect(alice.as.action(api.documents.writeNote, {})).rejects.toMatchObject({
+      data: "This costs 1 coin; you have 0",
+    });
+    expect(calls).toEqual([]);
   });
 });
 

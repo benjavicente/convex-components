@@ -702,11 +702,3 @@ progress::-moz-progress-bar {
     transition: none !important;
   }
 }
-
-.server-note {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 4px 12px;
-  margin-top: 14px;
-}

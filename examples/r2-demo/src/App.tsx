@@ -4,7 +4,7 @@ import {
   useMutation as useTanStackMutation,
   useQuery as useTanStackQuery,
 } from "@tanstack/react-query";
-import { useAction, useConvexAuth, useMutation, useQuery } from "convex/react";
+import { useConvexAuth, useMutation, useQuery } from "convex/react";
 import { useState, type ReactNode } from "react";
 import { api } from "../convex/_generated/api";
 import { DOCUMENTS, STICKERS } from "../convex/lib/pricing";
@@ -313,7 +313,6 @@ function Documents({ coins }: { coins: number | undefined }) {
         coins={coins}
         request={(info, title) => request({ ...info, title })}
       />
-      <WriteNote coins={coins} />
       <div className="collection-heading">
         <h3>Your documents</h3>
         <span>{documents?.length ?? "…"} filed</span>
@@ -337,32 +336,6 @@ function Documents({ coins }: { coins: number | undefined }) {
         </ul>
       )}
     </WorkCard>
-  );
-}
-
-/** Showcases `r2.store`: an action writes the file, and the same `onConfirm` files it. */
-function WriteNote({ coins }: { coins: number | undefined }) {
-  const writeNote = useAction(api.documents.writeNote);
-  const note = useTanStackMutation({ mutationFn: () => writeNote({}) });
-  return (
-    <div className="server-note">
-      <p className="file-hint">
-        Or have an action write a Markdown note and store it with <code>r2.store</code>.
-      </p>
-      <button
-        className="text-button"
-        disabled={note.isPending || coins === undefined || coins < DOCUMENTS.cost}
-        onClick={() => note.mutate()}
-      >
-        {note.isPending ? "Writing…" : "Write me a note"}
-      </button>
-      <div aria-live="polite">
-        {note.data?.status === "rejected" && (
-          <p className="note error">Rejected: {note.data.reason}. The file was deleted.</p>
-        )}
-        {note.isError && <p className="note error">{errorMessage(note.error)}</p>}
-      </div>
-    </div>
   );
 }
 

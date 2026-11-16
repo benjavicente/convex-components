@@ -103,6 +103,25 @@ export const confirmUpload = action({
 });
 ```
 
+From an action, `r2.store` uploads bytes the server already has. It goes through the same request, PUT and confirm steps, so `onConfirm` and `context` work the same, and it returns the same result as `confirm`:
+
+```ts
+export const writeNote = action({
+  args: {},
+  handler: async (ctx): Promise<ConfirmResult> => {
+    const user = await ctx.runQuery(api.users.me, {});
+    if (!user) throw new ConvexError("Sign in first");
+    return r2.store(ctx, {
+      keyPrefix: `notes/${user._id}`,
+      file: new Blob(["# Hello"], { type: "text/markdown" }),
+      name: "hello.md",
+      onConfirm: internal.notes.onUploaded,
+      context: { ownerId: user._id },
+    });
+  },
+});
+```
+
 Also available:
 
 - `r2.get(ctx, uploadId)` returns a ready upload with its Cloudflare dashboard link, or null. Pending uploads stay internal: the app hears about a file through `onConfirm`.
@@ -143,7 +162,7 @@ Measured against version 0.10.4.
 | Browser                         | React and Svelte hooks.                                                                                   | `uploadFile`, framework-agnostic, with hashing, progress and `AbortSignal`.                                                     |
 | Signing                         | AWS SDK v3.                                                                                               | About 100 lines of SigV4 on WebCrypto, tested against the AWS SDK's signer.                                                     |
 
-`@convex-dev/r2` also stores files from actions (`r2.store`), lists metadata, and accepts custom keys and per-bucket credentials. This package doesn't do those yet.
+`@convex-dev/r2` also lists every object's metadata, and accepts custom keys and per-bucket credentials. Here the app's own tables reference their uploads, so listing is the app's own query; keys are always server-generated; and one component instance uses one Cloudflare account.
 
 ### Size
 

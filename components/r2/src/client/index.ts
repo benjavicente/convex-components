@@ -7,7 +7,8 @@ import {
   type GenericQueryCtx,
 } from "convex/server";
 import type { ComponentApi } from "../component/_generated/component.js";
-import type { FileInfo, Upload, UploadRules } from "../component/validators.js";
+import type { ConfirmResult, FileInfo, Upload, UploadRules } from "../component/validators.js";
+import { sha256Hex } from "../browser/index.js";
 
 export {
   fileValidator,
@@ -21,6 +22,7 @@ export {
 type RunQueryCtx = Pick<GenericQueryCtx<GenericDataModel>, "runQuery">;
 type RunMutationCtx = Pick<GenericMutationCtx<GenericDataModel>, "runMutation">;
 type RunActionCtx = Pick<GenericActionCtx<GenericDataModel>, "runAction">;
+type StoreCtx = Pick<GenericActionCtx<GenericDataModel>, "runMutation" | "runAction">;
 
 /** The app's mutation that runs when an upload is confirmed. */
 export type OnConfirm<Context> = FunctionReference<
@@ -34,6 +36,18 @@ export type RequestUploadArgs<Context> = {
   keyPrefix: string;
   file: FileInfo;
   rules: UploadRules;
+  onConfirm: OnConfirm<Context>;
+  /** Passed to `onConfirm`; must match its `context` argument. */
+  context: NoInfer<Context>;
+};
+
+export type StoreArgs<Context> = {
+  /** The object key becomes `<keyPrefix>/<upload id>`. */
+  keyPrefix: string;
+  file: Blob;
+  name: string;
+  /** Defaults to the blob's type. */
+  contentType?: string;
   onConfirm: OnConfirm<Context>;
   /** Passed to `onConfirm`; must match its `context` argument. */
   context: NoInfer<Context>;
@@ -71,15 +85,37 @@ export class R2 {
     ctx: RunMutationCtx,
     args: RequestUploadArgs<Context>,
   ): Promise<RequestedUpload> {
+    return ctx.runMutation(this.component.uploads.request, await this.requestArgs(args));
+  }
+
+  private async requestArgs<Context>(args: RequestUploadArgs<Context>) {
     const { bucket } = this.options;
-    return ctx.runMutation(this.component.uploads.request, {
+    return {
       ...(bucket === undefined ? {} : { bucket }),
       keyPrefix: args.keyPrefix,
       file: args.file,
       rules: args.rules,
       onConfirm: await createFunctionHandle(args.onConfirm),
       context: args.context,
-    });
+    };
+  }
+
+  /**
+   * Uploads bytes from an action, through the same request, PUT and confirm
+   * steps as a browser upload: `onConfirm` runs once R2 holds the file, and a
+   * failed store is swept like any unconfirmed upload.
+   */
+  async store<Context>(ctx: StoreCtx, args: StoreArgs<Context>): Promise<ConfirmResult> {
+    const { file: blob, name, contentType = blob.type, ...rest } = args;
+    const file = { name, contentType, size: blob.size, sha256: await sha256Hex(blob) };
+    const rules = { maxSize: file.size, contentTypes: [contentType] };
+    const { uploadId, url, headers } = await ctx.runMutation(
+      this.component.uploads.request,
+      await this.requestArgs({ ...rest, file, rules }),
+    );
+    const response = await fetch(url, { method: "PUT", headers, body: blob });
+    if (!response.ok) throw new Error(`R2 PUT failed: ${response.status} ${await response.text()}`);
+    return this.confirm(ctx, uploadId);
   }
 
   /**

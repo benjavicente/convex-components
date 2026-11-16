@@ -21,7 +21,11 @@ const pdf = { name: "Contrato ñ.pdf", contentType: "application/pdf", size: 5, 
 type Call = { method: string; path: string };
 type FakeObject = { size: number; contentType: string; sha256: string };
 
-/** Fakes R2: HEAD answers with the object stored under that key, or 404. */
+/**
+ * Fakes R2: HEAD answers with the object stored under that key, or 404. Like
+ * Cloudflare, it compresses text and drops Content-Length unless the request
+ * asks for `Accept-Encoding: identity`.
+ */
 function fakeR2(objects: (key: string) => FakeObject | null) {
   const calls: Call[] = [];
   vi.stubGlobal(
@@ -33,9 +37,12 @@ function fakeR2(objects: (key: string) => FakeObject | null) {
       if (method !== "HEAD") return new Response(null, { status: 204 });
       const object = objects(path.replace(/^\/demo\//, ""));
       if (!object) return new Response(null, { status: 404 });
+      const compressed =
+        object.contentType.startsWith("text/") &&
+        new Headers(init?.headers).get("accept-encoding") !== "identity";
       return new Response(null, {
         headers: {
-          "content-length": String(object.size),
+          ...(compressed ? {} : { "content-length": String(object.size) }),
           "content-type": object.contentType,
           "x-amz-checksum-sha256": object.sha256,
         },
@@ -301,6 +308,34 @@ describe("confirming uploads", () => {
     expect(calls).toContainEqual({ method: "DELETE", path: `/demo/${key}` });
     expect(await coins(alice)).toBe(10);
     expect(await alice.as.query(api.stickers.mine, {})).toEqual([]);
+  });
+
+  test("confirms a text document, which Cloudflare would compress", async () => {
+    const t = setup();
+    const alice = await signIn(t, "alice");
+    const text = { ...pdf, name: "notes.md", contentType: "text/markdown" };
+    fakeR2(uploadedAsDeclared(text));
+    const { uploadId } = await alice.as.mutation(api.documents.requestUpload, {
+      title: "Notes",
+      ...text,
+    });
+    expect(await t.action(api.uploads.confirm, { uploadId })).toMatchObject({ status: "ready" });
+  });
+
+  test("a HEAD without Content-Length fails the confirm, keeping the upload", async () => {
+    const t = setup();
+    const alice = await signIn(t, "alice");
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => new Response(null, { headers: { "content-type": "image/png" } })),
+    );
+    const { uploadId } = await alice.as.mutation(api.stickers.requestUpload, {
+      label: "cat",
+      ...png,
+    });
+    await expect(t.action(api.uploads.confirm, { uploadId })).rejects.toThrow("no Content-Length");
+    fakeR2(uploadedAsDeclared(png));
+    expect(await t.action(api.uploads.confirm, { uploadId })).toMatchObject({ status: "ready" });
   });
 
   test("ignores ids that aren't uploads", async () => {

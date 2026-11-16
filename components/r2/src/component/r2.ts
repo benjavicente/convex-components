@@ -51,15 +51,30 @@ export function base64ToHex(value: string): string {
 export type ObjectHead = { size: number; contentType: string | null; sha256: string | null };
 
 /** HEADs an object. Returns null when it doesn't exist. Needs an action (fetch). */
+/** Signed into the HEAD: R2 only returns the SHA-256 when asked. */
+export const HEAD_SIGNED_HEADERS = { "x-amz-checksum-mode": "ENABLED" };
+/**
+ * Not signed: Cloudflare compresses text responses and then drops
+ * Content-Length, even on HEAD, unless the response is asked uncompressed.
+ */
+export const HEAD_HEADERS = { ...HEAD_SIGNED_HEADERS, "Accept-Encoding": "identity" };
+
 export async function headObject(bucket: string, key: string): Promise<ObjectHead | null> {
-  const headers = { "x-amz-checksum-mode": "ENABLED" };
-  const url = await presignObject(bucket, key, { method: "HEAD", headers, expiresIn: 60 });
-  const response = await fetch(url, { method: "HEAD", headers });
+  const url = await presignObject(bucket, key, {
+    method: "HEAD",
+    headers: HEAD_SIGNED_HEADERS,
+    expiresIn: 60,
+  });
+  const response = await fetch(url, { method: "HEAD", headers: HEAD_HEADERS });
   if (response.status === 404) return null;
   if (!response.ok) throw new Error(`R2 HEAD ${key} failed: ${response.status}`);
+  // Throwing lets the caller retry; reading a missing length as 0 would
+  // reject and delete a good file.
+  const length = response.headers.get("content-length");
+  if (length === null) throw new Error(`R2 HEAD ${key} returned no Content-Length`);
   const checksum = response.headers.get("x-amz-checksum-sha256");
   return {
-    size: Number(response.headers.get("content-length")),
+    size: Number(length),
     contentType: response.headers.get("content-type"),
     sha256: checksum ? base64ToHex(checksum) : null,
   };

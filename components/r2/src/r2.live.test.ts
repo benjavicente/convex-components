@@ -3,7 +3,13 @@
 // R2_TEST_ACCESS_KEY_ID, R2_TEST_SECRET_ACCESS_KEY and R2_TEST_BUCKET set; the
 // token needs Object Read & Write on that bucket.
 import { afterAll, describe, expect, test } from "vite-plus/test";
-import { base64ToHex, hexToBase64, objectUrl } from "./component/r2.js";
+import {
+  base64ToHex,
+  HEAD_HEADERS,
+  HEAD_SIGNED_HEADERS,
+  hexToBase64,
+  objectUrl,
+} from "./component/r2.js";
 import { encodePath, presign } from "./component/sigv4.js";
 
 const env = {
@@ -57,15 +63,35 @@ describe.skipIf(!configured)("real R2", () => {
     const response = await fetch(put.url, { method: "PUT", headers: put.headers, body });
     expect(response.status, await response.text()).toBe(200);
 
-    const headHeaders = { "x-amz-checksum-mode": "ENABLED" };
-    const head = await fetch(await signed("HEAD", put.key, headHeaders), {
+    const head = await fetch(await signed("HEAD", put.key, HEAD_SIGNED_HEADERS), {
       method: "HEAD",
-      headers: headHeaders,
+      headers: HEAD_HEADERS,
     });
     expect(head.status).toBe(200);
     expect(head.headers.get("content-type")).toBe("text/plain");
     expect(head.headers.get("content-length")).toBe("5");
     expect(base64ToHex(head.headers.get("x-amz-checksum-sha256") ?? "")).toBe(sha256);
+  });
+
+  test("reports the size of a compressible text file on HEAD", async () => {
+    const key = `${prefix}/long text.txt`;
+    keys.push(key);
+    const text = new TextEncoder().encode("Cloudflare compresses this. ".repeat(100));
+    const headers = { "Content-Type": "text/plain" };
+    const putUrl = await presign(credentials, {
+      method: "PUT",
+      url: url(key),
+      headers,
+      expiresIn: 60,
+      now: Date.now(),
+    });
+    expect((await fetch(putUrl, { method: "PUT", headers, body: text })).status).toBe(200);
+
+    const head = await fetch(await signed("HEAD", key, HEAD_SIGNED_HEADERS), {
+      method: "HEAD",
+      headers: HEAD_HEADERS,
+    });
+    expect(head.headers.get("content-length")).toBe(String(text.length));
   });
 
   test("If-None-Match: * refuses a second PUT to the same key", async () => {

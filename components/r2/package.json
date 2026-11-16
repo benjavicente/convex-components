@@ -2,10 +2,26 @@
   "name": "@benjavicente/convex-r2",
   "version": "0.0.0",
   "description": "Cloudflare R2 uploads for Convex: server-owned keys, bound presigned URLs and typed confirmation callbacks.",
+  "keywords": [
+    "cloudflare",
+    "convex",
+    "convex-component",
+    "r2",
+    "upload"
+  ],
+  "homepage": "https://github.com/benjavicente/convex-components/tree/main/components/r2#readme",
+  "bugs": "https://github.com/benjavicente/convex-components/issues",
   "license": "MIT",
+  "author": "Benjamín Vicente",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/benjavicente/convex-components.git",
+    "directory": "components/r2"
+  },
   "files": [
     "dist",
-    "src"
+    "src",
+    "!src/**/*.test.ts"
   ],
   "type": "module",
   "exports": {
@@ -40,6 +56,7 @@
     "convex": "catalog:",
     "convex-test": "catalog:",
     "typescript": "catalog:",
+    "vite": "catalog:",
     "vite-plus": "catalog:"
   },
   "peerDependencies": {

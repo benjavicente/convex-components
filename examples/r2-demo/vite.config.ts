@@ -1,8 +1,9 @@
+import tailwindcss from "@tailwindcss/vite";
 import react from "@vitejs/plugin-react";
 import { defineConfig } from "vite-plus";
 
 export default defineConfig({
-  plugins: [react()],
+  plugins: [react(), tailwindcss()],
   // `convex dev` writes the deployment URL as CONVEX_URL to .env.local.
   envPrefix: ["VITE_", "CONVEX_URL"],
   test: {

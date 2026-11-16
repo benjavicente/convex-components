@@ -24,6 +24,16 @@ function Brand() {
   );
 }
 
+const REPOSITORY = "https://github.com/benjavicente/convex-components";
+
+function RepoLink() {
+  return (
+    <a className="text-button" href={REPOSITORY}>
+      GitHub <span aria-hidden="true">↗</span>
+    </a>
+  );
+}
+
 export function App() {
   const { isLoading, isAuthenticated } = useConvexAuth();
   return (
@@ -52,6 +62,7 @@ function SignIn() {
     <div className="desk-shell">
       <header className="topbar">
         <Brand />
+        <RepoLink />
       </header>
       <main id="main" className="welcome">
         <div className="welcome-copy">
@@ -95,6 +106,7 @@ function Uploads() {
       <header className="topbar">
         <Brand />
         <div className="account">
+          <RepoLink />
           <div className="coin-pouch">
             <span className="coin-star" aria-hidden="true">
               ★
@@ -192,7 +204,12 @@ function DeskRules() {
           </li>
         ))}
       </ol>
-      <p className="footer-line">Built with Convex and Cloudflare R2</p>
+      <p className="footer-line">
+        Built with Convex and Cloudflare R2.
+        <a className="text-button" href={`${REPOSITORY}/tree/main/components/r2#readme`}>
+          Read the component's README
+        </a>
+      </p>
     </footer>
   );
 }

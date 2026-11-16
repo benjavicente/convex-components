@@ -2,7 +2,7 @@
   "name": "@benjavicente/convex-r2",
   "version": "0.0.0",
   "description": "Cloudflare R2 uploads for Convex: server-owned keys, bound presigned URLs and typed confirmation callbacks.",
-  "license": "Apache-2.0",
+  "license": "MIT",
   "files": [
     "dist",
     "src"

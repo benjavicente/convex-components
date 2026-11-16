@@ -25,7 +25,6 @@ import {
   confirmResultValidator,
   fileValidator,
   rulesValidator,
-  statusValidator,
   uploadValidator,
   type ConfirmResult,
   type FileInfo,
@@ -212,7 +211,8 @@ export const finalize = internalMutation({
       await removeRow(ctx, row);
       return { status: "rejected", reason: refusal(error) };
     }
-    await ctx.db.patch("uploads", row._id, { status: "ready" });
+    const { uploadId: _, ...object } = upload;
+    await ctx.db.replace("uploads", row._id, { ...object, status: "ready" });
     return { status: "ready", upload };
   },
 });
@@ -256,13 +256,15 @@ export const deleteObject = internalAction({
   },
 });
 
-const uploadInfoValidator = v.object({
+const uploadInfo = {
   ...uploadValidator.fields,
-  status: statusValidator,
-  expiresAt: v.number(),
   /** The object in the Cloudflare dashboard. */
   link: v.string(),
-});
+};
+const uploadInfoValidator = v.union(
+  v.object({ ...uploadInfo, status: v.literal("pending"), expiresAt: v.number() }),
+  v.object({ ...uploadInfo, status: v.literal("ready") }),
+);
 
 export const get = query({
   args: { uploadId: v.string() },
@@ -271,7 +273,10 @@ export const get = query({
     const row = await loadRow(ctx, uploadId);
     if (!row) return null;
     const link = dashboardLink(r2Config().accountId, row.bucket, row.key);
-    return { ...toUpload(row), status: row.status, expiresAt: row.expiresAt, link };
+    const info = { ...toUpload(row), link };
+    return row.status === "pending"
+      ? { ...info, status: row.status, expiresAt: row.expiresAt }
+      : { ...info, status: row.status };
   },
 });
 

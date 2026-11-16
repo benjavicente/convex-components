@@ -8,6 +8,7 @@ import { afterEach, beforeEach, describe, expect, test, vi } from "vite-plus/tes
 import { api, components, internal } from "./_generated/api";
 import type { Id } from "./_generated/dataModel";
 import type { MutationCtx } from "./_generated/server";
+import { r2 } from "./lib/r2";
 import schema from "./schema";
 
 const modules = import.meta.glob("./**/*.ts");
@@ -230,6 +231,24 @@ describe("confirming uploads", () => {
     expect(await t.action(api.uploads.confirm, { uploadId: second.uploadId })).toEqual({
       status: "missing",
     });
+  });
+
+  test("a ready upload keeps no expiry, callback or context", async () => {
+    const t = setup();
+    const alice = await signIn(t, "alice");
+    fakeR2(uploadedAsDeclared(png));
+    const { uploadId } = await alice.as.mutation(api.stickers.requestUpload, {
+      label: "cat",
+      ...png,
+    });
+    expect(await t.run((ctx) => r2.get(ctx, uploadId))).toMatchObject({
+      status: "pending",
+      expiresAt: expect.any(Number),
+    });
+    await t.action(api.uploads.confirm, { uploadId });
+    const ready = await t.run((ctx) => r2.get(ctx, uploadId));
+    expect(ready).toMatchObject({ status: "ready", key: expect.stringContaining(uploadId) });
+    expect(ready).not.toHaveProperty("expiresAt");
   });
 
   test("before the PUT, reports notUploaded and charges nothing", async () => {

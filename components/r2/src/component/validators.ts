@@ -24,8 +24,6 @@ export const uploadValidator = v.object({
 });
 export type Upload = Infer<typeof uploadValidator>;
 
-export const statusValidator = v.union(v.literal("pending"), v.literal("ready"));
-
 export const confirmResultValidator = v.union(
   v.object({ status: v.literal("ready"), upload: uploadValidator }),
   /** The object isn't in R2 yet. */

@@ -1,9 +1,10 @@
 import { fileValidator, type RequestedUpload, uploadValidator } from "@benjavicente/convex-r2";
-import { ConvexError, v } from "convex/values";
+import { v } from "convex/values";
 import { internal } from "./_generated/api";
 import { internalMutation, mutation, query } from "./_generated/server";
 import { currentUserId } from "./lib/auth";
 import { assertCoins } from "./lib/coins";
+import { requiredText } from "./lib/text";
 import { DOCUMENTS } from "./lib/pricing";
 import { r2 } from "./lib/r2";
 
@@ -11,14 +12,14 @@ export const requestUpload = mutation({
   args: { title: v.string(), ...fileValidator.fields },
   handler: async (ctx, { title, ...file }): Promise<RequestedUpload> => {
     const ownerId = await currentUserId(ctx);
-    if (!title.trim()) throw new ConvexError("A document needs a title");
+    title = requiredText(title, "A document needs a title");
     await assertCoins(ctx, ownerId, DOCUMENTS.cost);
     return r2.requestUpload(ctx, {
       keyPrefix: `documents/${ownerId}`,
       file,
       rules: { maxSize: DOCUMENTS.maxSize, contentTypes: DOCUMENTS.contentTypes },
       onConfirm: internal.documents.onUploaded,
-      context: { ownerId, title: title.trim() },
+      context: { ownerId, title },
     });
   },
 });
@@ -38,7 +39,8 @@ export const onUploaded = internalMutation({
 export const mine = query({
   args: {},
   handler: async (ctx) => {
-    const ownerId = await currentUserId(ctx);
+    const ownerId = await currentUserId(ctx, { optional: true });
+    if (!ownerId) return [];
     return ctx.db
       .query("documents")
       .withIndex("ownerId", (q) => q.eq("ownerId", ownerId))

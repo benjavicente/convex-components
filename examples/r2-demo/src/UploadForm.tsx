@@ -96,6 +96,7 @@ export function UploadForm({
         name="text"
         placeholder={sticker ? "e.g. Frog" : "e.g. Lease agreement"}
         required
+        maxLength={100}
         pattern=".*\S.*"
         disabled={mutation.isPending}
       />

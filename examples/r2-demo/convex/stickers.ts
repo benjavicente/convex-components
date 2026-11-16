@@ -4,6 +4,7 @@ import { internal } from "./_generated/api";
 import { internalMutation, mutation, query } from "./_generated/server";
 import { currentUserId } from "./lib/auth";
 import { assertCoins } from "./lib/coins";
+import { requiredText } from "./lib/text";
 import { STICKERS } from "./lib/pricing";
 import { r2 } from "./lib/r2";
 
@@ -11,6 +12,7 @@ export const requestUpload = mutation({
   args: { label: v.string(), ...fileValidator.fields },
   handler: async (ctx, { label, ...file }): Promise<RequestedUpload> => {
     const ownerId = await currentUserId(ctx);
+    label = requiredText(label, "A sticker needs a label");
     await assertCoins(ctx, ownerId, STICKERS.cost);
     return r2.requestUpload(ctx, {
       keyPrefix: `stickers/${ownerId}`,
@@ -36,7 +38,8 @@ export const onUploaded = internalMutation({
 export const mine = query({
   args: {},
   handler: async (ctx) => {
-    const ownerId = await currentUserId(ctx);
+    const ownerId = await currentUserId(ctx, { optional: true });
+    if (!ownerId) return [];
     return ctx.db
       .query("stickers")
       .withIndex("ownerId", (q) => q.eq("ownerId", ownerId))

@@ -112,6 +112,23 @@ describe("requesting uploads", () => {
     );
   });
 
+  test("lists nothing, rather than failing, when signed out", async () => {
+    const t = setup();
+    expect(await t.query(api.stickers.mine, {})).toEqual([]);
+    expect(await t.query(api.documents.mine, {})).toEqual([]);
+  });
+
+  test.each([
+    [" ", "A sticker needs a label"],
+    ["x".repeat(101), "Keep it under 100 characters"],
+  ])("checks the sticker label %#", async (label, message) => {
+    const t = setup();
+    const alice = await signIn(t, "alice");
+    await expect(
+      alice.as.mutation(api.stickers.requestUpload, { label, ...png }),
+    ).rejects.toMatchObject({ data: message });
+  });
+
   test("signs a short-lived PUT bound to the declared file, under a server key", async () => {
     const t = setup();
     const alice = await signIn(t, "alice");

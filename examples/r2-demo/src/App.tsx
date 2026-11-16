@@ -269,13 +269,18 @@ function Sticker({ sticker }: { sticker: Doc<"stickers"> }) {
     // Refresh before the server's one-hour signed URL expires.
     staleTime: 50 * 60 * 1000,
   });
-  const [imageFailed, setImageFailed] = useState(false);
+  // A refreshed URL gets a fresh try.
+  const [failedUrl, setFailedUrl] = useState<string | null>(null);
   const deletion = useTanStackMutation({ mutationFn: () => remove({ stickerId: sticker._id }) });
   return (
     <li className="sticker-item">
       <div className="sticker-image">
-        {signedUrl.data && !imageFailed ? (
-          <img src={signedUrl.data} alt={sticker.label} onError={() => setImageFailed(true)} />
+        {signedUrl.data && signedUrl.data !== failedUrl ? (
+          <img
+            src={signedUrl.data}
+            alt={sticker.label}
+            onError={() => setFailedUrl(signedUrl.data)}
+          />
         ) : (
           <span className="text-sm">{signedUrl.isPending ? "Loading…" : "Image unavailable"}</span>
         )}

@@ -41,3 +41,11 @@ Each request checks the price before signing, and each `onConfirm` charges the c
    ```
 
 Open http://localhost:5173.
+
+## Deploy
+
+The live demo is at https://r2-demo.benjavicente.workers.dev: the page is an assets-only Worker, and the backend is the Convex project's production deployment. Its GitHub OAuth app calls back to the production site URL, and the bucket's CORS rule and `allowedRedirectOrigins` in `convex/auth.ts` both list the Worker's URL.
+
+```sh
+pnpm run deploy  # convex deploy builds the page with the prod CONVEX_URL, then cf deploys dist
+```

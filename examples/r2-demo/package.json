@@ -5,6 +5,7 @@
   "scripts": {
     "dev": "convex dev --start 'vp dev'",
     "codegen": "convex codegen --component-dir ../../components/r2/src/component && convex codegen",
+    "deploy": "convex deploy --cmd 'vp build' --cmd-url-env-var-name CONVEX_URL && cf deploy dist",
     "test": "vp test"
   },
   "dependencies": {

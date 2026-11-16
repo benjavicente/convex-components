@@ -7,5 +7,5 @@ export const { signOut, refreshSession, isAuthenticated } = auth;
 
 export const { startSignInWithGithub, completeSignInWithGithub } = setupGithub(auth, {
   component: components.authGithub,
-  allowedRedirectOrigins: ["http://localhost:5173"],
+  allowedRedirectOrigins: ["http://localhost:5173", "https://r2-demo.benjavicente.workers.dev"],
 }).attachUserCallbacks({ createUser: internal.users.createUser });

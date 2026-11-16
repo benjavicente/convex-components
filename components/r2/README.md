@@ -67,6 +67,7 @@ export const requestUpload = mutation({
   handler: async (ctx, { companyId, ...file }): Promise<RequestedUpload> => {
     const user = await currentUser(ctx);
     await assertCanUploadTo(ctx, user, companyId);
+    // Throws a ConvexError, whose message the client sees, when the file breaks the rules.
     return r2.requestUpload(ctx, {
       keyPrefix: `companies/${companyId}`,
       file,

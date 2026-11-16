@@ -129,14 +129,15 @@ describe("requesting uploads", () => {
     ["documents", { size: 50 * 1024 + 1 }, "larger than 51200"],
     ["documents", { size: 0 }, "positive integer"],
     ["documents", { sha256: "ABC" }, "lowercase hex"],
-  ] as const)("%s rejects %o", async (type, change, message) => {
+  ] as const)("%s rejects %o with a message for the client", async (type, change, message) => {
     const t = setup();
     const alice = await signIn(t, "alice");
     const request =
       type === "stickers"
         ? alice.as.mutation(api.stickers.requestUpload, { label: "x", ...png, ...change })
         : alice.as.mutation(api.documents.requestUpload, { title: "x", ...pdf, ...change });
-    await expect(request).rejects.toThrow(message);
+    // A ConvexError's data is what reaches the client; a plain Error's message doesn't.
+    await expect(request).rejects.toMatchObject({ data: expect.stringContaining(message) });
   });
 
   test("each type checks its own price before signing", async () => {

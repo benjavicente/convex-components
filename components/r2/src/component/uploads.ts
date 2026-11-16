@@ -46,19 +46,20 @@ function toUpload(row: Doc<"uploads">): Upload {
   return { uploadId: _id, bucket, key, name, contentType, size, sha256 };
 }
 
+/** Throws a `ConvexError`, so the client sees why its file was refused. */
 function checkFile(file: FileInfo, rules: UploadRules) {
-  if (!file.name) throw new Error("File name is empty");
+  if (!file.name) throw new ConvexError("File name is empty");
   if (!rules.contentTypes.includes(file.contentType)) {
-    throw new Error(`Content type ${file.contentType} is not allowed`);
+    throw new ConvexError(`Content type ${file.contentType} is not allowed`);
   }
   if (!Number.isSafeInteger(file.size) || file.size <= 0) {
-    throw new Error("File size must be a positive integer");
+    throw new ConvexError("File size must be a positive integer");
   }
   if (file.size > Math.min(rules.maxSize, MAX_PUT_SIZE)) {
-    throw new Error(`File is larger than ${Math.min(rules.maxSize, MAX_PUT_SIZE)} bytes`);
+    throw new ConvexError(`File is larger than ${Math.min(rules.maxSize, MAX_PUT_SIZE)} bytes`);
   }
   if (!/^[0-9a-f]{64}$/.test(file.sha256)) {
-    throw new Error("sha256 must be 64 lowercase hex characters");
+    throw new ConvexError("sha256 must be 64 lowercase hex characters");
   }
 }
 

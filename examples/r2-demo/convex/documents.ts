@@ -1,5 +1,5 @@
 import { fileValidator, type RequestedUpload, uploadValidator } from "@benjavicente/convex-r2";
-import { v } from "convex/values";
+import { ConvexError, v } from "convex/values";
 import { internal } from "./_generated/api";
 import { internalMutation, mutation, query } from "./_generated/server";
 import { currentUserId } from "./lib/auth";
@@ -11,7 +11,7 @@ export const requestUpload = mutation({
   args: { title: v.string(), ...fileValidator.fields },
   handler: async (ctx, { title, ...file }): Promise<RequestedUpload> => {
     const ownerId = await currentUserId(ctx);
-    if (!title.trim()) throw new Error("A document needs a title");
+    if (!title.trim()) throw new ConvexError("A document needs a title");
     await assertCoins(ctx, ownerId, DOCUMENTS.cost);
     return r2.requestUpload(ctx, {
       keyPrefix: `documents/${ownerId}`,

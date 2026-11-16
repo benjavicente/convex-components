@@ -91,6 +91,7 @@ export class R2 {
     return ctx.runAction(this.component.uploads.confirm, { uploadId });
   }
 
+  /** A ready upload with its Cloudflare dashboard link (null otherwise). */
   async get(ctx: RunQueryCtx, uploadId: string) {
     return ctx.runQuery(this.component.uploads.get, { uploadId });
   }

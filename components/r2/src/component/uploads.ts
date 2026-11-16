@@ -272,27 +272,20 @@ export const deleteObject = internalAction({
   },
 });
 
-const uploadInfo = {
+const uploadInfoValidator = v.object({
   ...uploadValidator.fields,
   /** The object in the Cloudflare dashboard. */
   link: v.string(),
-};
-const uploadInfoValidator = v.union(
-  v.object({ ...uploadInfo, status: v.literal("pending"), expiresAt: v.number() }),
-  v.object({ ...uploadInfo, status: v.literal("ready") }),
-);
+});
 
+/** A ready upload with its dashboard link; null while pending or when missing. */
 export const get = query({
   args: { uploadId: v.string() },
   returns: v.union(uploadInfoValidator, v.null()),
   handler: async (ctx, { uploadId }) => {
     const row = await loadRow(ctx, uploadId);
-    if (!row) return null;
-    const link = dashboardLink(r2Config().accountId, row.bucket, row.key);
-    const info = { ...toUpload(row), link };
-    return row.pending
-      ? { ...info, status: "pending" as const, expiresAt: row.pending.expiresAt }
-      : { ...info, status: "ready" as const };
+    if (!row || row.pending) return null;
+    return { ...toUpload(row), link: dashboardLink(r2Config().accountId, row.bucket, row.key) };
   },
 });
 

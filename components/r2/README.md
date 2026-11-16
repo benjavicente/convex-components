@@ -105,7 +105,7 @@ export const confirmUpload = action({
 
 Also available:
 
-- `r2.get(ctx, uploadId)` returns the upload with its status, expiry and Cloudflare dashboard link.
+- `r2.get(ctx, uploadId)` returns a ready upload with its Cloudflare dashboard link, or null. Pending uploads stay internal: the app hears about a file through `onConfirm`.
 - `r2.getUrl(ctx, uploadId, { expiresIn, disposition })` returns a signed GET that serves the file under its name, for ready uploads only.
 
   > A Convex query's result stays cached until the data it read changes, not until the URL inside it expires, so a subscribed page can keep showing an expired URL. Sign from a mutation or action when the URL must be fresh, or use an `expiresIn` longer than the page lives.

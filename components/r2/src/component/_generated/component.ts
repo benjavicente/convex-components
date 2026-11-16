@@ -49,30 +49,16 @@ export type ComponentApi<Name extends string | undefined = string | undefined> =
         "query",
         "internal",
         { uploadId: string },
-        | {
-            bucket: string;
-            contentType: string;
-            expiresAt: number;
-            key: string;
-            link: string;
-            name: string;
-            sha256: string;
-            size: number;
-            status: "pending";
-            uploadId: string;
-          }
-        | {
-            bucket: string;
-            contentType: string;
-            key: string;
-            link: string;
-            name: string;
-            sha256: string;
-            size: number;
-            status: "ready";
-            uploadId: string;
-          }
-        | null,
+        {
+          bucket: string;
+          contentType: string;
+          key: string;
+          link: string;
+          name: string;
+          sha256: string;
+          size: number;
+          uploadId: string;
+        } | null,
         Name
       >;
       getUrl: FunctionReference<

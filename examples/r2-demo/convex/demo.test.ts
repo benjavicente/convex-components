@@ -250,7 +250,7 @@ describe("confirming uploads", () => {
     });
   });
 
-  test("a ready upload keeps no expiry, callback or context", async () => {
+  test("an upload is visible to the app only once it is ready", async () => {
     const t = setup();
     const alice = await signIn(t, "alice");
     fakeR2(uploadedAsDeclared(png));
@@ -258,14 +258,15 @@ describe("confirming uploads", () => {
       label: "cat",
       ...png,
     });
-    expect(await t.run((ctx) => r2.get(ctx, uploadId))).toMatchObject({
-      status: "pending",
-      expiresAt: expect.any(Number),
-    });
+    expect(await t.run((ctx) => r2.get(ctx, uploadId))).toBeNull();
     await t.action(api.uploads.confirm, { uploadId });
-    const ready = await t.run((ctx) => r2.get(ctx, uploadId));
-    expect(ready).toMatchObject({ status: "ready", key: expect.stringContaining(uploadId) });
-    expect(ready).not.toHaveProperty("expiresAt");
+    expect(await t.run((ctx) => r2.get(ctx, uploadId))).toEqual({
+      uploadId,
+      bucket: "demo",
+      key: `stickers/${alice.userId}/${uploadId}`,
+      ...png,
+      link: expect.stringContaining("dash.cloudflare.com"),
+    });
   });
 
   test("before the PUT, reports notUploaded and charges nothing", async () => {

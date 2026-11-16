@@ -24,8 +24,12 @@ export const uploadValidator = v.object({
 });
 export type Upload = Infer<typeof uploadValidator>;
 
+/**
+ * What `confirm` returns. It carries no upload details: anyone who has an
+ * upload id may confirm it, so names and keys are left to `onConfirm` and `get`.
+ */
 export const confirmResultValidator = v.union(
-  v.object({ status: v.literal("ready"), upload: uploadValidator }),
+  v.object({ status: v.literal("ready") }),
   /** The object isn't in R2 yet. */
   v.object({ status: v.literal("notUploaded") }),
   /** The object didn't match the request, or `onConfirm` threw; both were deleted. */

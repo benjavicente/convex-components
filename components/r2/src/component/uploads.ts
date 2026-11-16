@@ -174,7 +174,7 @@ export const request = mutation({
 /**
  * Checks the object in R2 against its request. On a match, marks the upload
  * ready and runs `onConfirm` in one transaction. Safe to call from untrusted
- * clients: it only reads R2.
+ * clients: it only reads R2, and its result has no upload details.
  */
 export const confirm = action({
   args: { uploadId: v.string() },
@@ -182,7 +182,7 @@ export const confirm = action({
   handler: async (ctx, { uploadId }): Promise<ConfirmResult> => {
     const row = await ctx.runQuery(internal.uploads.load, { uploadId });
     if (!row) return { status: "missing" };
-    if (!row.pending) return { status: "ready", upload: toUpload(row) };
+    if (!row.pending) return { status: "ready" };
     const head = await headObject(row.bucket, row.key);
     if (!head) return { status: "notUploaded" };
     return ctx.runMutation(internal.uploads.finalize, { uploadId, head });
@@ -207,8 +207,7 @@ export const finalize = internalMutation({
   handler: async (ctx, { uploadId, head }): Promise<ConfirmResult> => {
     const row = await loadRow(ctx, uploadId);
     if (!row) return { status: "missing" };
-    const upload = toUpload(row);
-    if (!row.pending) return { status: "ready", upload };
+    if (!row.pending) return { status: "ready" };
     const { onConfirm, context } = row.pending;
     const reason = mismatch(row, head);
     if (reason) {
@@ -218,13 +217,13 @@ export const finalize = internalMutation({
     try {
       // A throwing callback rolls back its own writes only, so the app
       // refuses an upload by throwing and the rejection below still commits.
-      await ctx.runMutation(onConfirm, { upload, context });
+      await ctx.runMutation(onConfirm, { upload: toUpload(row), context });
     } catch (error) {
       await removeRow(ctx, row);
       return { status: "rejected", reason: refusal(error) };
     }
     await ctx.db.patch("uploads", row._id, { pending: undefined });
-    return { status: "ready", upload };
+    return { status: "ready" };
   },
 });
 

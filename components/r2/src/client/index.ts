@@ -105,7 +105,10 @@ export class R2 {
    * steps as a browser upload: `onConfirm` runs once R2 holds the file, and a
    * failed store is swept like any unconfirmed upload.
    */
-  async store<Context>(ctx: StoreCtx, args: StoreArgs<Context>): Promise<ConfirmResult> {
+  async store<Context>(
+    ctx: StoreCtx,
+    args: StoreArgs<Context>,
+  ): Promise<ConfirmResult & { uploadId: string }> {
     const { file: blob, name, contentType = blob.type, ...rest } = args;
     const file = { name, contentType, size: blob.size, sha256: await sha256Hex(blob) };
     const rules = { maxSize: file.size, contentTypes: [contentType] };
@@ -115,15 +118,16 @@ export class R2 {
     );
     const response = await fetch(url, { method: "PUT", headers, body: blob });
     if (!response.ok) throw new Error(`R2 PUT failed: ${response.status} ${await response.text()}`);
-    return this.confirm(ctx, uploadId);
+    return { uploadId, ...(await this.confirm(ctx, uploadId)) };
   }
 
   /**
    * Checks the uploaded object against its request and, if it matches, runs
    * `onConfirm`. It trusts nothing but the upload id, so a public action may
-   * call it without authorization.
+   * call it without authorization: the result is only a status and, when
+   * rejected, the reason.
    */
-  async confirm(ctx: RunActionCtx, uploadId: string) {
+  async confirm(ctx: RunActionCtx, uploadId: string): Promise<ConfirmResult> {
     return ctx.runAction(this.component.uploads.confirm, { uploadId });
   }
 

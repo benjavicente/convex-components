@@ -5,8 +5,8 @@ import {
   fileValidator,
   R2,
   uploadValidator,
-  type ConfirmResult,
   type RequestedUpload,
+  type StoreResult,
 } from "../../src/client/index.js";
 import { components, internal } from "./_generated/api.js";
 import { action, internalMutation, mutation, query } from "./_generated/server.js";
@@ -42,7 +42,7 @@ export const confirm = action({
 
 export const store = action({
   args: { text: v.string() },
-  handler: (ctx, { text }): Promise<ConfirmResult & { uploadId: string }> =>
+  handler: (ctx, { text }): Promise<StoreResult> =>
     r2.store(ctx, {
       keyPrefix: "notes",
       file: new Blob([text], { type: "text/plain" }),

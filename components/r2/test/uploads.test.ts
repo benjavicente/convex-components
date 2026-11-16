@@ -298,11 +298,9 @@ describe("reading, deleting and storing", () => {
   test("store uploads from an action through the same confirm", async () => {
     const t = setup();
     const calls = fakeR2();
-    const result = await t.action(api.app.store, { text: "hello" });
-    expect(result).toEqual({ uploadId: expect.any(String), status: "ready" });
+    const { uploadId, result } = await t.action(api.app.store, { text: "hello" });
+    expect(result).toEqual({ status: "ready" });
     expect(calls.map((c) => c.method)).toEqual(["PUT", "HEAD"]);
-    expect(await t.query(api.app.documents, {})).toMatchObject([
-      { uploadId: result.uploadId, name: "note.txt" },
-    ]);
+    expect(await t.query(api.app.documents, {})).toMatchObject([{ uploadId, name: "note.txt" }]);
   });
 });

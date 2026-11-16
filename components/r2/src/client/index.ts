@@ -53,6 +53,9 @@ export type StoreArgs<Context> = {
   context: NoInfer<Context>;
 };
 
+/** What `store` returns: the upload's id and the result of confirming it. */
+export type StoreResult = { uploadId: string; result: ConfirmResult };
+
 /**
  * What `requestUpload` returns. Annotate the app's request handler with it:
  * the handler references `internal.*`, which TypeScript can't infer through.
@@ -105,10 +108,7 @@ export class R2 {
    * steps as a browser upload: `onConfirm` runs once R2 holds the file, and a
    * failed store is swept like any unconfirmed upload.
    */
-  async store<Context>(
-    ctx: StoreCtx,
-    args: StoreArgs<Context>,
-  ): Promise<ConfirmResult & { uploadId: string }> {
+  async store<Context>(ctx: StoreCtx, args: StoreArgs<Context>): Promise<StoreResult> {
     const { file: blob, name, contentType = blob.type, ...rest } = args;
     const file = { name, contentType, size: blob.size, sha256: await sha256Hex(blob) };
     const rules = { maxSize: file.size, contentTypes: [contentType] };
@@ -118,7 +118,7 @@ export class R2 {
     );
     const response = await fetch(url, { method: "PUT", headers, body: blob });
     if (!response.ok) throw new Error(`R2 PUT failed: ${response.status} ${await response.text()}`);
-    return { uploadId, ...(await this.confirm(ctx, uploadId)) };
+    return { uploadId, result: await this.confirm(ctx, uploadId) };
   }
 
   /**

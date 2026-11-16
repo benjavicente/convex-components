@@ -104,12 +104,12 @@ export const confirmUpload = action({
 });
 ```
 
-From an action, `r2.store` uploads bytes the server already has. It goes through the same request, PUT and confirm steps, so `onConfirm` and `context` work the same. It returns the same result as `confirm`, plus the `uploadId`:
+From an action, `r2.store` uploads bytes the server already has. It goes through the same request, PUT and confirm steps, so `onConfirm` and `context` work the same. It returns the `uploadId` and the same result as `confirm`:
 
 ```ts
 export const writeNote = action({
   args: {},
-  handler: async (ctx): Promise<ConfirmResult & { uploadId: string }> => {
+  handler: async (ctx): Promise<StoreResult> => {
     const user = await ctx.runQuery(api.users.me, {});
     if (!user) throw new ConvexError("Sign in first");
     return r2.store(ctx, {
@@ -146,12 +146,6 @@ const { confirmed } = await uploadFile(file, {
 ```
 
 `uploadFile` hashes the file (reading it into memory), PUTs it with XHR for progress, then calls `confirm`. Without `confirm`, the upload is confirmed after the URL expires plus a grace period: a minute, plus a second per MB, up to 30 minutes.
-
-## Tests
-
-- `test/uploads.test.ts` runs the whole flow under `convex-test` through a small app in `test/convex`: request, confirm, rejection, sweep, retries, `get`, `getUrl`, `delete` and `store`. R2 is faked.
-- `src/r2.live.test.ts` checks what real R2 enforces on the presigned PUT. Set `R2_TEST_ACCOUNT_ID`, `R2_TEST_ACCESS_KEY_ID`, `R2_TEST_SECRET_ACCESS_KEY` and `R2_TEST_BUCKET` (a token with Object Read & Write on that bucket), then run `pnpm run test:r2`. Last run: 2026-11-16, 9 of 9 passing against a real bucket. R2 accepted the signed PUT and refused a longer body, a different SHA-256, a different `Content-Type`, a second PUT to the same key, a PUT without `If-None-Match`, and an expired URL. HEAD reported the size of a compressible text file.
-- Rollback of a refused upload, on a real deployment (Convex 1.50.0 dev deployment, 2026-11-16): an `onConfirm` that inserted a row, then threw `ConvexError("Refused by the probe")`, through `r2.store`. `confirm` returned `{ status: "rejected", reason: "Refused by the probe" }`, the inserted row was gone, the component's `uploads` table was empty, and the scheduled `deleteObject` succeeded.
 
 ## Compared with `@convex-dev/r2`
 

@@ -1,22 +1,26 @@
 import { ConvexError } from "convex/values";
 import type { Id } from "../_generated/dataModel";
-import type { MutationCtx, QueryCtx } from "../_generated/server";
+import type { QueryCtx } from "../_generated/server";
+import { DOCUMENTS, STARTING_COINS, STICKERS } from "./pricing";
 
-/** Fails early, at request time, when the user can't pay for an upload. */
-export async function assertCoins(ctx: QueryCtx, userId: Id<"users">, cost: number) {
-  const user = await ctx.db.get("users", userId);
-  if (!user || user.coins < cost) {
-    throw new ConvexError(`This costs ${cost} coins; you have ${user?.coins ?? 0}`);
-  }
-  return user;
+/** Coins left: what the user started with, minus the cost of the files they keep. */
+export async function coinsLeft(ctx: QueryCtx, ownerId: Id<"users">) {
+  const owned = (table: "stickers" | "documents") =>
+    ctx.db
+      .query(table)
+      .withIndex("ownerId", (q) => q.eq("ownerId", ownerId))
+      .collect();
+  const [stickers, documents] = await Promise.all([owned("stickers"), owned("documents")]);
+  return STARTING_COINS - stickers.length * STICKERS.cost - documents.length * DOCUMENTS.cost;
 }
 
 /**
- * Charges when the upload is confirmed. A `ConvexError` here rejects the
- * upload, and its message reaches the client, e.g. when two pending uploads
- * both passed `assertCoins`.
+ * Throws a `ConvexError`, whose message reaches the client, when the user
+ * can't pay. Requests call it to fail early; `onConfirm` calls it again right
+ * before inserting the row that spends the coins, which rejects the upload
+ * when two pending ones both passed the first check.
  */
-export async function spendCoins(ctx: MutationCtx, userId: Id<"users">, cost: number) {
-  const user = await assertCoins(ctx, userId, cost);
-  await ctx.db.patch("users", userId, { coins: user.coins - cost });
+export async function assertCoins(ctx: QueryCtx, ownerId: Id<"users">, cost: number) {
+  const coins = await coinsLeft(ctx, ownerId);
+  if (coins < cost) throw new ConvexError(`This costs ${cost} coins; you have ${coins}`);
 }

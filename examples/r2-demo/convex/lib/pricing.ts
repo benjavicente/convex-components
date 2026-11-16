@@ -1,5 +1,8 @@
 // Plain constants, so the page can import them too.
 
+/** Coins a user has before keeping any files. */
+export const STARTING_COINS = 10;
+
 /** Images up to 200 KB for 3 coins. */
 export const STICKERS = {
   cost: 3,

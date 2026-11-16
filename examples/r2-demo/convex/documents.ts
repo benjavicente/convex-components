@@ -3,7 +3,7 @@ import { ConvexError, v } from "convex/values";
 import { internal } from "./_generated/api";
 import { internalMutation, mutation, query } from "./_generated/server";
 import { currentUserId } from "./lib/auth";
-import { assertCoins, spendCoins } from "./lib/coins";
+import { assertCoins } from "./lib/coins";
 import { DOCUMENTS } from "./lib/pricing";
 import { r2 } from "./lib/r2";
 
@@ -29,7 +29,7 @@ export const onUploaded = internalMutation({
     context: v.object({ ownerId: v.id("users"), title: v.string() }),
   },
   handler: async (ctx, { upload, context }) => {
-    await spendCoins(ctx, context.ownerId, DOCUMENTS.cost);
+    await assertCoins(ctx, context.ownerId, DOCUMENTS.cost);
     const { uploadId, name, size } = upload;
     await ctx.db.insert("documents", { ...context, uploadId, fileName: name, size });
   },

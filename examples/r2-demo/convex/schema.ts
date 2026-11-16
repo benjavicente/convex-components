@@ -6,7 +6,6 @@ export default defineSchema({
   users: defineTable({
     login: v.string(),
     avatarUrl: v.optional(v.string()),
-    coins: v.number(),
   }),
   stickers: defineTable({
     ownerId: v.id("users"),

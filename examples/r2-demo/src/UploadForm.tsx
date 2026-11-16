@@ -88,13 +88,13 @@ export function UploadForm({
       }}
     >
       <label className="field-label" htmlFor={`${kind}-text`}>
-        {sticker ? "Give it a label" : "Give it a title"}
+        {sticker ? "Label" : "Title"}
       </label>
       <input
         className="text-input"
         id={`${kind}-text`}
         name="text"
-        placeholder={sticker ? "e.g. A very good frog" : "e.g. My tiny masterpiece"}
+        placeholder={sticker ? "e.g. Frog" : "e.g. Lease agreement"}
         required
         pattern=".*\S.*"
         disabled={mutation.isPending}
@@ -116,12 +116,10 @@ export function UploadForm({
           {sticker ? "✿" : "↥"}
         </span>
         <label htmlFor={id} className="file-label">
-          {file ? file.name : "Drop a little file here"}
+          {file ? file.name : "Drop a file here"}
         </label>
         <span className="text-sm">
-          {file
-            ? `${file.size.toLocaleString()} bytes · choose another below`
-            : "or choose one from your computer"}
+          {file ? `${file.size.toLocaleString()} bytes` : "or click to choose one"}
         </span>
         <input
           id={id}
@@ -160,29 +158,21 @@ export function UploadForm({
       </div>
       {insufficient && (
         <p className="file-hint">
-          You need {cost} {cost === 1 ? "coin" : "coins"}; you have {coins}. Try a lower-cost upload
-          if you can.
+          You need {cost} {cost === 1 ? "coin" : "coins"} and have {coins}. Delete a file to get its
+          coins back.
         </p>
       )}
-      {coins === undefined && <p className="file-hint">Checking your coin balance…</p>}
+
       {mutation.isPending && (
         <div className="upload-progress">
           <progress aria-label={`${kind} upload progress`} max={100} value={progress} />
-          <p>
-            {confirming
-              ? "File sent. Checking server rules; this step cannot be cancelled."
-              : `Preparing & sending your file · ${progress}%`}
-          </p>
+          <p>{confirming ? "Checking the file on the server…" : `Uploading · ${progress}%`}</p>
         </div>
       )}
       <div aria-live="polite" aria-atomic="true">
-        {result?.status === "ready" && (
-          <p className="note success">★ All done! Your {kind} is on the desk.</p>
-        )}
+        {result?.status === "ready" && <p className="note success">Uploaded.</p>}
         {result?.status === "rejected" && (
-          <p className="note error">
-            A note from the server: {result.reason}. The refused file is deleted.
-          </p>
+          <p className="note error">Rejected: {result.reason}. The file was deleted.</p>
         )}
         {result && result.status !== "ready" && result.status !== "rejected" && (
           <p className="note error">

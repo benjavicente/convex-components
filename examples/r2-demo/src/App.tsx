@@ -7,7 +7,7 @@ import {
 import { useConvexAuth, useMutation, useQuery } from "convex/react";
 import { useState, type ReactNode } from "react";
 import { api } from "../convex/_generated/api";
-import { STICKERS, DOCUMENTS } from "../convex/lib/pricing";
+import { DOCUMENTS, STARTING_COINS, STICKERS } from "../convex/lib/pricing";
 import type { Doc } from "../convex/_generated/dataModel";
 import { errorMessage, UploadForm } from "./UploadForm";
 
@@ -18,7 +18,7 @@ function Brand() {
         r2<span>✦</span>
       </span>
       <span>
-        the upload desk<small>A CONVEX + R2 PLAYGROUND</small>
+        Convex R2 Component<small>DEMO</small>
       </span>
     </a>
   );
@@ -33,7 +33,7 @@ export function App() {
       </a>
       {isLoading ? (
         <main id="main" className="loading" role="status">
-          <span className="font-display text-3xl">Setting up your desk…</span>
+          <span className="font-display text-3xl">Loading…</span>
         </main>
       ) : isAuthenticated ? (
         <Uploads />
@@ -52,56 +52,19 @@ function SignIn() {
     <div className="desk-shell">
       <header className="topbar">
         <Brand />
-        <span className="desk-tag">small files, big possibilities</span>
       </header>
       <main id="main" className="welcome">
         <div className="welcome-copy">
-          <p className="eyebrow">A LITTLE UPLOAD WORKSHOP</p>
-          <h1>
-            Make yourself
-            <br />
-            at <span className="underline-crayon">home.</span>
-          </h1>
-          <p className="intro">
-            A place for your favorite stickers, tiny documents, and a little experimenting.
-          </p>
-          <div className="welcome-samples" aria-hidden="true">
-            <span className="sample-flower">✿</span>
-            <span className="sample-paper">
-              a tiny
-              <br />
-              masterpiece <span>★</span>
-            </span>
-            <span className="sample-star">★</span>
-          </div>
+          <Intro />
         </div>
         <section className="name-card paper-card">
-          <div className="name-band">
-            HELLO, CREATOR<small>this desk is yours</small>
-          </div>
+          <div className="name-band">Try the demo</div>
           <div className="name-body">
-            <span className="gold-star" aria-hidden="true">
-              ★
-            </span>
-            <h2>Let’s make something.</h2>
             <p>
-              Sign in with GitHub and start with <strong>5 coins</strong>. Spend them on two little
-              ways to upload.
+              Sign in with GitHub to get <strong>{STARTING_COINS} coins</strong>. A sticker costs{" "}
+              {STICKERS.cost} coins and a document costs {DOCUMENTS.cost}. Deleting a file gives its
+              coins back.
             </p>
-            <div className="welcome-prices">
-              <span>
-                ✿ Stickers{" "}
-                <strong>
-                  {STICKERS.cost} {STICKERS.cost === 1 ? "coin" : "coins"}
-                </strong>
-              </span>
-              <span>
-                ▤ Documents{" "}
-                <strong>
-                  {DOCUMENTS.cost} {DOCUMENTS.cost === 1 ? "coin" : "coins"}
-                </strong>
-              </span>
-            </div>
             <button
               className="button ink w-full"
               disabled={signin.isPending}
@@ -110,9 +73,6 @@ function SignIn() {
               {signin.isPending ? "Opening GitHub…" : "Sign in with GitHub"}
               <span aria-hidden="true">↗</span>
             </button>
-            <p className="file-hint text-center">
-              Your own collection. Live updates. Real server rules.
-            </p>
             {flowError && (
               <p className="note error" role="alert">
                 Sign-in failed: {flowError.error}
@@ -146,7 +106,7 @@ function Uploads() {
             </span>
             <span>
               <strong>{me?.coins ?? "…"} coins</strong>
-              <small>in your pocket</small>
+              <small>left</small>
             </span>
           </div>
           <div className="account-name">
@@ -168,19 +128,7 @@ function Uploads() {
       )}
       <main id="main">
         <div className="desk-heading">
-          <div>
-            <p className="eyebrow">PICK A FILE. MAKE IT YOURS.</p>
-            <h1>
-              Your little <span className="underline-crayon">upload desk.</span>
-            </h1>
-            <p className="intro">Two upload paths. A few coins. Plenty of room to play.</p>
-          </div>
-          <span className="desk-stamp" aria-hidden="true">
-            small files
-            <br />
-            <b>BIG IDEAS</b>
-            <span>✦ ✦ ✦</span>
-          </span>
+          <Intro />
         </div>
         <div className="workspaces">
           <Stickers coins={me?.coins} />
@@ -192,36 +140,62 @@ function Uploads() {
   );
 }
 
+function Intro() {
+  return (
+    <>
+      <h1>Convex R2 Component</h1>
+      <p className="intro">
+        Upload files from the browser straight to Cloudflare R2. The server checks each file and
+        then runs your <code>onConfirm</code> mutation, so you get full control without a webhook.
+      </p>
+    </>
+  );
+}
+
 function DeskRules() {
   return (
     <footer className="desk-rules">
-      <p className="font-display text-xl">A little look under the paper.</p>
+      <p className="font-display text-xl">How it works</p>
       <ol>
         <li>
           <span>1</span>
           <div>
-            <strong>Request a spot</strong>
-            <p>Each upload path checks its own file type, size and coin rules on the server.</p>
+            <strong>Request</strong>
+            <p>
+              Your mutation checks the user and the price. The component then signs a 5-minute,
+              single-use upload URL for that exact file: its type, size and SHA-256.
+            </p>
           </div>
         </li>
         <li>
           <span>2</span>
           <div>
-            <strong>Straight to R2</strong>
-            <p>Your browser hashes the file and uploads directly, with progress along the way.</p>
+            <strong>Upload</strong>
+            <p>The browser hashes the file and sends it to R2 directly, with progress.</p>
           </div>
         </li>
         <li>
           <span>3</span>
           <div>
-            <strong>One final check</strong>
-            <p>Confirmation spends your coins. If the server refuses, the file is deleted.</p>
+            <strong>Confirm</strong>
+            <p>
+              The server compares the stored file with the request and runs your{" "}
+              <code>onConfirm</code> in the same transaction. If it throws, the file is deleted.
+            </p>
+          </div>
+        </li>
+        <li>
+          <span>4</span>
+          <div>
+            <strong>Clean up</strong>
+            <p>
+              Uploads that are never confirmed are checked when they expire. This demo also deletes
+              files after 30 days.
+            </p>
           </div>
         </li>
       </ol>
-      <p className="footer-line">
-        Built with Convex + Cloudflare R2 <span>Made for small experiments ✦</span>
-      </p>
+      <p className="footer-line">Built with Convex and Cloudflare R2</p>
     </footer>
   );
 }
@@ -237,10 +211,7 @@ function WorkCard({ kind, children }: { kind: "sticker" | "document"; children: 
           {sticker ? "✿" : "▤"}
         </span>
         <div>
-          <p className="eyebrow">{sticker ? "01 / STICKER SHEET" : "02 / PAPER FOLDER"}</p>
-          <h2 id={`${kind}-heading`}>
-            {sticker ? "Stick something good." : "File a little thought."}
-          </h2>
+          <h2 id={`${kind}-heading`}>{sticker ? "Stickers" : "Documents"}</h2>
         </div>
       </div>
       <div className="price-tag">
@@ -248,8 +219,8 @@ function WorkCard({ kind, children }: { kind: "sticker" | "document"; children: 
       </div>
       <p className="section-description">
         {sticker
-          ? "Tiny images, ready to collect. Saved with a label and shown with a signed image URL."
-          : "A home for your words. Saved with a title and downloaded as an attachment."}
+          ? "Images saved with a label. Each upload type has its own request mutation, rules and onConfirm. The page shows stickers through signed URLs."
+          : "PDF or text files saved with a title, in their own table with their own rules. Downloads use a signed URL that serves the file as an attachment."}
       </p>
       {children}
     </section>
@@ -267,20 +238,19 @@ function Stickers({ coins }: { coins: number | undefined }) {
         request={(info, label) => request({ ...info, label })}
       />
       <div className="collection-heading">
-        <h3>Your sticker sheet</h3>
+        <h3>Your stickers</h3>
         <span>{stickers?.length ?? "…"} collected</span>
       </div>
       {stickers === undefined ? (
         <p role="status" className="empty-state">
-          Opening your sticker sheet…
+          Loading…
         </p>
       ) : stickers.length === 0 ? (
         <div className="empty-state">
           <span className="empty-doodles" aria-hidden="true">
             ✧ ✿ ♡
           </span>
-          <p>Your first sticker goes here.</p>
-          <small>Upload a tiny image to start your collection.</small>
+          <p>No stickers yet.</p>
         </div>
       ) : (
         <ul className="sticker-grid">
@@ -342,20 +312,19 @@ function Documents({ coins }: { coins: number | undefined }) {
         request={(info, title) => request({ ...info, title })}
       />
       <div className="collection-heading">
-        <h3>Your paper folder</h3>
+        <h3>Your documents</h3>
         <span>{documents?.length ?? "…"} filed</span>
       </div>
       {documents === undefined ? (
         <p role="status" className="empty-state">
-          Opening your folder…
+          Loading…
         </p>
       ) : documents.length === 0 ? (
         <div className="empty-state folder-empty">
           <span className="empty-doodles" aria-hidden="true">
             ▤
           </span>
-          <p>A fresh folder, just for you.</p>
-          <small>Drop in a document to fill the first page.</small>
+          <p>No documents yet.</p>
         </div>
       ) : (
         <ul className="document-list">

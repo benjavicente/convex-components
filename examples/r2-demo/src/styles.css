@@ -110,18 +110,6 @@
   top: -12px;
   right: -8px;
 }
-.desk-tag {
-  font-size: 13px;
-  transform: rotate(-3deg);
-  border-bottom: 2px solid #ce8e60;
-  padding-bottom: 4px;
-}
-.eyebrow {
-  font-size: 10px;
-  font-weight: 900;
-  letter-spacing: 0.16em;
-  margin-bottom: 7px;
-}
 .intro {
   font-size: 17px;
   margin-top: 16px;
@@ -133,43 +121,6 @@
   justify-content: space-between;
   gap: 20px;
   padding: 48px 0 52px;
-}
-.underline-crayon {
-  position: relative;
-  isolation: isolate;
-  white-space: nowrap;
-}
-.underline-crayon::after {
-  content: "";
-  position: absolute;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  height: 0.18em;
-  background: #f1c947;
-  transform: rotate(-1deg);
-  z-index: -1;
-  border-radius: 40% 15% 30% 20%;
-}
-.desk-stamp {
-  border: 2px dashed #7d8f6b;
-  color: #52674a;
-  border-radius: 50%;
-  width: 120px;
-  height: 120px;
-  flex-shrink: 0;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  transform: rotate(10deg);
-  font-size: 13px;
-}
-.desk-stamp b {
-  font-size: 16px;
-}
-.desk-stamp span {
-  color: #9b7120;
 }
 .account {
   display: flex;
@@ -265,9 +216,6 @@
 }
 .document-card .section-icon {
   color: #796021;
-}
-.section-heading .eyebrow {
-  font-size: 9px;
 }
 .price-tag {
   display: inline-block;
@@ -448,9 +396,6 @@ progress::-moz-progress-bar {
   font-size: 13px;
   font-weight: 800;
 }
-.empty-state small {
-  font-size: 11px;
-}
 .empty-doodles {
   display: block;
   font-size: 33px;
@@ -601,23 +546,8 @@ progress::-moz-progress-bar {
   letter-spacing: 0.08em;
   padding: 14px;
 }
-.name-band small {
-  display: block;
-  font-weight: 500;
-  font-size: 12px;
-  letter-spacing: 0.04em;
-}
 .name-body {
   padding: 20px 28px 12px;
-}
-.gold-star {
-  display: block;
-  color: #ca9215;
-  font-size: 45px;
-  text-align: center;
-  line-height: 1;
-  margin-bottom: 15px;
-  text-shadow: 2px 2px #f9dc7d;
 }
 .name-body h2 {
   text-align: center;
@@ -628,49 +558,6 @@ progress::-moz-progress-bar {
 }
 .name-body > .file-hint {
   font-size: 10px;
-}
-.welcome-prices {
-  display: flex;
-  justify-content: space-around;
-  gap: 12px;
-  margin: 22px 0;
-  font-size: 13px;
-}
-.welcome-prices strong {
-  display: block;
-  font-size: 11px;
-}
-.welcome-samples {
-  display: flex;
-  align-items: center;
-  gap: 20px;
-  margin-top: 32px;
-}
-.sample-flower {
-  font-size: 94px;
-  line-height: 1;
-  color: #b44534;
-  transform: rotate(-12deg);
-  text-shadow: 3px 3px #fffdf4;
-}
-.sample-paper {
-  background: #dce9f1;
-  font-family: var(--font-display);
-  border: 1px solid #becad1;
-  padding: 13px 24px;
-  transform: rotate(8deg);
-  font-size: 17px;
-  box-shadow: 2px 4px #0001;
-}
-.sample-paper span {
-  display: block;
-  text-align: right;
-  color: #657c44;
-}
-.sample-star {
-  font-size: 55px;
-  color: #cb961c;
-  transform: rotate(12deg);
 }
 .loading {
   min-height: 100dvh;
@@ -701,21 +588,12 @@ progress::-moz-progress-bar {
   .work-card {
     transform: none;
   }
-  .desk-stamp {
-    display: none;
-  }
   .desk-heading {
     padding: 35px 0 40px;
   }
   .welcome {
     gap: 35px;
     padding: 40px 0 0;
-  }
-  .welcome-samples {
-    gap: 10px;
-  }
-  .sample-star {
-    display: none;
   }
   .name-body {
     padding: 20px;
@@ -741,9 +619,6 @@ progress::-moz-progress-bar {
   }
   .brand small {
     font-size: 7px;
-  }
-  .desk-tag {
-    display: none;
   }
   .account {
     flex-direction: column;
@@ -795,9 +670,6 @@ progress::-moz-progress-bar {
   }
   .welcome h1 {
     font-size: 3.5rem;
-  }
-  .welcome-samples {
-    display: none;
   }
   .name-card {
     margin: 0 4px;

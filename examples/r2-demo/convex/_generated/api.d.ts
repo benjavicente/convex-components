@@ -16,6 +16,7 @@ import type * as lib_auth from "../lib/auth.js";
 import type * as lib_coins from "../lib/coins.js";
 import type * as lib_pricing from "../lib/pricing.js";
 import type * as lib_r2 from "../lib/r2.js";
+import type * as lib_text from "../lib/text.js";
 import type * as stickers from "../stickers.js";
 import type * as uploads from "../uploads.js";
 import type * as users from "../users.js";
@@ -35,6 +36,7 @@ declare const fullApi: ApiFromModules<{
   "lib/coins": typeof lib_coins;
   "lib/pricing": typeof lib_pricing;
   "lib/r2": typeof lib_r2;
+  "lib/text": typeof lib_text;
   stickers: typeof stickers;
   uploads: typeof uploads;
   users: typeof users;

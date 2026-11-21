@@ -20,6 +20,7 @@ Run from the root unless noted. Use the local `vp` (`pnpm exec vp`, or a global 
 ## Conventions
 
 - English everywhere. Conventional commits, small and coherent. No AI co-author trailers or attribution.
+- A change to a published package needs a changeset (`pnpm changeset`, or a file in `.changeset/`). Never bump versions or publish by hand: the Release workflow does both.
 - Pin dependencies exactly. Ones shared by several packages go in the `catalog` of `pnpm-workspace.yaml` and are referenced as `catalog:`; the rest are pinned in their package's `package.json`.
 - Prefer tool defaults; a comment next to each non-default setting says why.
 - One source per fact; no config or docs without a current need.

@@ -3,9 +3,12 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "ready": "vp run -r build && vp check && vp run -r test"
+    "ready": "vp run -r build && vp check && vp run -r test",
+    "changeset": "changeset",
+    "release:version": "changeset version && vp fmt"
   },
   "devDependencies": {
+    "@changesets/cli": "3.0.3",
     "vite-plus": "catalog:"
   },
   "devEngines": {

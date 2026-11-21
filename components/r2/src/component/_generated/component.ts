@@ -34,6 +34,16 @@ export type ComponentApi<Name extends string | undefined = string | undefined> =
         | { status: "missing" },
         Name
       >;
+      confirmStored: FunctionReference<
+        "mutation",
+        "internal",
+        { uploadId: string },
+        | { status: "ready" }
+        | { status: "notUploaded" }
+        | { reason: string; status: "rejected" }
+        | { status: "missing" },
+        Name
+      >;
       get: FunctionReference<
         "query",
         "internal",

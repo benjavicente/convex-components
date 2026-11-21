@@ -16,6 +16,10 @@ pnpm install
 pnpm run ready  # build, then format, lint, typecheck and test
 ```
 
+## Releasing
+
+Each change to a published package comes with a changeset: run `pnpm changeset`, pick the package and the bump, and write the changelog entry. On `main`, the Release workflow keeps a "Version Packages" PR up to date with the bumps and changelogs. Merging it publishes to npm through [trusted publishing](https://docs.npmjs.com/trusted-publishers), with no npm token, then tags the release and creates a GitHub release.
+
 ## License
 
 MIT

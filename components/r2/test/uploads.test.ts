@@ -369,12 +369,36 @@ describe("reading, deleting and storing", () => {
     expect(await t.action(api.app.confirm, { uploadId })).toEqual({ status: "missing" });
   });
 
-  test("store uploads from an action through the same confirm", async () => {
+  test("a refused store leaves no write and deletes the object", async () => {
+    const t = setup();
+    fakeR2();
+    const { uploadId, result } = await t.action(api.app.store, { text: "hello", refuse: true });
+    expect(result).toEqual({ status: "rejected", reason: "Refused by the app" });
+    await t.finishAllScheduledFunctions(vi.runAllTimers);
+    expect(objects.size).toBe(0);
+    expect(await t.query(api.app.documents, {})).toEqual([]);
+    expect(await t.query(api.app.get, { uploadId })).toBeNull();
+  });
+
+  test("a store whose PUT fails throws, and the sweep removes its request", async () => {
+    const t = setup();
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => new Response("denied", { status: 403 })),
+    );
+    await expect(t.action(api.app.store, { text: "hello" })).rejects.toThrow("R2 PUT failed: 403");
+    const calls = fakeR2();
+    await t.finishAllScheduledFunctions(vi.runAllTimers);
+    expect(calls.map((c) => c.method)).toEqual(["HEAD", "DELETE", "DELETE"]);
+    expect(await t.query(api.app.documents, {})).toEqual([]);
+  });
+
+  test("store PUTs once and runs onConfirm without a HEAD", async () => {
     const t = setup();
     const calls = fakeR2();
     const { uploadId, result } = await t.action(api.app.store, { text: "hello" });
     expect(result).toEqual({ status: "ready" });
-    expect(calls.map((c) => c.method)).toEqual(["PUT", "HEAD"]);
+    expect(calls.map((c) => c.method)).toEqual(["PUT"]);
     expect(await t.query(api.app.documents, {})).toMatchObject([{ uploadId, name: "note.txt" }]);
   });
 });

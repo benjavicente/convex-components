@@ -106,7 +106,7 @@ export const confirmUpload = action({
 });
 ```
 
-From an action, `r2.store` uploads bytes the server already has. It goes through the same request, PUT and confirm steps, so `onConfirm` and `context` work the same. It returns the `uploadId` and the same result as `confirm`:
+From an action, `r2.store` uploads bytes the server already has. It records the request, PUTs the file, then runs `onConfirm` with your `context`, as a browser upload would. It skips the HEAD: R2 only accepts a PUT signed for the file's size and SHA-256 when the bytes match. It returns the `uploadId` and the same result as `confirm`:
 
 ```ts
 export const writeNote = action({

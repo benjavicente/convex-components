@@ -22,7 +22,7 @@ export {
 type RunQueryCtx = Pick<GenericQueryCtx<GenericDataModel>, "runQuery">;
 type RunMutationCtx = Pick<GenericMutationCtx<GenericDataModel>, "runMutation">;
 type RunActionCtx = Pick<GenericActionCtx<GenericDataModel>, "runAction">;
-type StoreCtx = Pick<GenericActionCtx<GenericDataModel>, "runMutation" | "runAction">;
+type StoreCtx = Pick<GenericActionCtx<GenericDataModel>, "runMutation">;
 
 /** The app's mutation that runs when an upload is confirmed. */
 export type OnConfirm<Context> = FunctionReference<
@@ -104,9 +104,10 @@ export class R2 {
   }
 
   /**
-   * Uploads bytes from an action, through the same request, PUT and confirm
-   * steps as a browser upload: `onConfirm` runs once R2 holds the file, and a
-   * failed store is swept like any unconfirmed upload.
+   * Uploads bytes from an action: records the request, PUTs the file, then
+   * runs `onConfirm`. R2 accepting the signed PUT proves the object matches,
+   * so there is no HEAD. A store that fails midway is swept like any
+   * unconfirmed upload.
    */
   async store<Context>(ctx: StoreCtx, args: StoreArgs<Context>): Promise<StoreResult> {
     const { file: blob, name, contentType = blob.type, ...rest } = args;
@@ -118,7 +119,8 @@ export class R2 {
     );
     const response = await fetch(url, { method: "PUT", headers, body: blob });
     if (!response.ok) throw new Error(`R2 PUT failed: ${response.status} ${await response.text()}`);
-    return { uploadId, result: await this.confirm(ctx, uploadId) };
+    const result = await ctx.runMutation(this.component.uploads.confirmStored, { uploadId });
+    return { uploadId, result };
   }
 
   /**
